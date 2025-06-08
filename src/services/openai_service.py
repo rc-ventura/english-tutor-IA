@@ -1,65 +1,54 @@
 import logging
-import os
-import tempfile
-import shutil
-from typing import Optional
+from typing import Optional, Dict
 from openai import OpenAI
 
 class OpenAIService:
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+        if not api_key:
+            raise ValueError("API key is required for OpenAIService.")
+       
         self.client = OpenAI(api_key=api_key)
         self.model = model
+        logging.basicConfig(level=logging.INFO) 
+
         
-    def get_chat_completion(self, messages: list):
+    def get_chat_completion(self, messages: list[dict], temperature: float = 0.7, max_tokens: int = 1000 ) -> Dict:
         """Handle chat completion requests."""
+        
+        logging.info(f"Requesting chat completion with model {self.model} for {len(messages)} messages.")
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=messages
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens
             )
+            logging.info("Chat completion received successfully.")
             return response
         except Exception as e:
-            logging.error(f"OpenAI API error: {e}")
+            logging.error(f"OpenAI API error during chat completion: {e}", exc_info=True)
             raise
             
-    def transcribe_audio(self, audio_file) -> str:
+    def transcribe_audio(self, audio_file_path: str) -> Optional[str]:
         """Transcribe audio using Whisper.
         Returns the transcribed text or empty string on error/cancel."""
-        if not audio_file:
-            return ""
-            
+        
+        logging.info(f"Transcribing audio file: {audio_file_path}")
         try:
-            if isinstance(audio_file, str):
-                if not os.path.isfile(audio_file):
-                    return ""
-                with open(audio_file, "rb") as f:
-                    if f.read(4) != b'RIFF':
-                        return ""
-                    f.seek(0)
-                    result = self.client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=f,
-                        language="en"
-                    )
-            else:
-                with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-                    shutil.copyfileobj(audio_file, temp_file)
-                    temp_path = temp_file.name
+
+            with open(audio_file_path, "rb") as audio_file:
+                transcript = self.client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    language="en",
+                    response_format="text"
+                    
+                )
                 
-                try:
-                    with open(temp_path, "rb") as f:
-                        result = self.client.audio.transcriptions.create(
-                            model="whisper-1",
-                            file=f,
-                            language="en"
-                        )
-                finally:
-                    try:
-                        os.unlink(temp_path)
-                    except:
-                        pass
-                        
-            return result.text.strip() if hasattr(result, 'text') else ""
-            
-        except Exception:
-            return ""
+            logging.info("Audio transcribed successfully.")
+            return transcript
+                
+        except Exception as e:
+            logging.error(f"OpenAI API error during audio transcription: {e}", exc_info=True)
+            raise

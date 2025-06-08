@@ -7,8 +7,9 @@ dependencies:
   - python-dotenv
   - openai
   - pydub
+  - gtts
   - ffmpeg
   - pip
   - pip:
-    - gradio==5.29.0
-    - gradio-client==1.10.0
+      - gradio==5.29.0
+      - gradio-client==1.10.0

@@ -40,8 +40,8 @@ class SpeakingTutor(BaseTutor):
             "full_history": history
         })
         try:
-            response = self.openai_service.get_chat_completion(messages=messages)
-            reply = response.choices[0].message.content
+            chunks = self.openai_service.stream_chat_completion(messages=messages)
+            reply = "".join(chunk for chunk in chunks)
         except Exception as e:
             logging.error(f"OpenAI chat completion error: {e}", exc_info=True)
             return f"Sorry, I encountered an issue generating a response: {e}", history

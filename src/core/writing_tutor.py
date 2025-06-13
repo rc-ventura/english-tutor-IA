@@ -5,10 +5,12 @@ from typing import List, Dict, Optional
 import logging
 
 class WritingTutor(BaseTutor):
-    
-    def process_input(self, essay_text: str, history: List[Dict], level: Optional[str] = None) -> tuple[str, List[Dict]]:
+
+    def process_input(self, essay_text: str, history: List[Dict], level: Optional[str] = None) -> tuple[List[Dict], List[Dict]]:
+        """Evaluate an essay and return updated chat history."""
         if not essay_text or not essay_text.strip():
-            return "No essay provided. Please write your essay.", history
+            # Keep return type consistent for the Chatbot component
+            return [{"role": "assistant", "content": "No essay provided. Please write your essay."}], history
         
 
 
@@ -38,8 +40,8 @@ class WritingTutor(BaseTutor):
          
         
         
-    def generate_random_topic(self, level: Optional[str] = None, history: Optional[List[Dict]] = None) -> tuple[str, List[Dict]]:
-
+    def generate_random_topic(self, level: Optional[str] = None, history: Optional[List[Dict]] = None) -> tuple[List[Dict], List[Dict]]:
+        
         user_prompt_content = f"Generate a topic for a writing essay for a student with the level of {level}. Also, suggest structure and number of lines and number of words expectation."
         
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)
@@ -65,7 +67,7 @@ class WritingTutor(BaseTutor):
         ]
                  
 
-        get_generate_topic = [{"role": "assistant", "content": topic_suggestion}], updated_history
+        generated_topic_output = [{"role": "assistant", "content": topic_suggestion}], updated_history
          # Optional: TTS for the topic suggestion
         # try:
         #     talker(topic_suggestion)
@@ -75,7 +77,7 @@ class WritingTutor(BaseTutor):
         
         #talker(topic_suggestion)
 
-        return get_generate_topic
+        return generated_topic_output
 
         
 

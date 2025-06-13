@@ -38,16 +38,17 @@ class OpenAIService:
         try:
 
             with open(audio_file_path, "rb") as audio_file:
-                transcript = self.client.audio.transcriptions.create(
+                result = self.client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio_file,
                     language="en",
                     response_format="text"
-                    
+
                 )
                 
             logging.info("Audio transcribed successfully.")
-            return transcript
+            # The OpenAI client returns a Transcription object; extract the text
+            return result.text if hasattr(result, "text") else str(result)
                 
         except Exception as e:
             logging.error(f"OpenAI API error during audio transcription: {e}", exc_info=True)

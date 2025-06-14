@@ -21,9 +21,8 @@ class WritingTutor(BaseTutor):
         messages = [{"role": "system", "content": system_prompt}] + new_history
         
         try:
-    
-            response = self.openai_service.get_chat_completion(messages=messages)
-            feedback = response.choices[0].message.content
+            chunks = self.openai_service.stream_chat_completion(messages=messages)
+            feedback = "".join(chunk for chunk in chunks)
         except Exception as e:
             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
             return [{"role": "assistant", "content": f"Sorry, I encountered an issue generating a response: {e}"}], history
@@ -52,10 +51,10 @@ class WritingTutor(BaseTutor):
         ]
 
         try:
-            response = self.openai_service.get_chat_completion(
+            chunks = self.openai_service.stream_chat_completion(
                 messages=messages_for_topic
             )
-            topic_suggestion = response.choices[0].message.content
+            topic_suggestion = "".join(chunk for chunk in chunks)
         except Exception as e:
             logging.error(f"Topic generation error: {e}", exc_info=True)
             return [{"role": "assistant", "content": f"Sorry, I couldn't generate a topic right now: {e}"}], history

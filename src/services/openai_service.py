@@ -9,10 +9,15 @@ class OpenAIService:
        
         self.client = OpenAI(api_key=api_key)
         self.model = model
-        logging.basicConfig(level=logging.INFO) 
+        logging.basicConfig(level=logging.INFO)
 
         
-    def get_chat_completion(self, messages: list[dict], temperature: float = 0.7, max_tokens: int = 1000 ) -> Dict:
+    def get_chat_completion(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+    ) -> Dict:
         """Handle chat completion requests."""
         
         logging.info(f"Requesting chat completion with model {self.model} for {len(messages)} messages.")
@@ -22,12 +27,42 @@ class OpenAIService:
                 model=self.model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
             logging.info("Chat completion received successfully.")
             return response
         except Exception as e:
             logging.error(f"OpenAI API error during chat completion: {e}", exc_info=True)
+            raise
+
+    def stream_chat_completion(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+    ):
+        """Stream chat completion tokens one by one."""
+
+        logging.info(
+            f"Requesting streaming chat completion with model {self.model} for {len(messages)} messages."
+        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+
+            for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            logging.error(
+                f"OpenAI API error during streaming chat completion: {e}",
+                exc_info=True,
+            )
             raise
             
     def transcribe_audio(self, audio_file_path: str) -> Optional[str]:

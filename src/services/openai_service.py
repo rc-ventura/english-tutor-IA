@@ -1,17 +1,18 @@
 import logging
-from typing import Optional, Dict
+from typing import Dict, Optional
+
 from openai import OpenAI
+
 
 class OpenAIService:
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         if not api_key:
             raise ValueError("API key is required for OpenAIService.")
-       
+
         self.client = OpenAI(api_key=api_key)
         self.model = model
         logging.basicConfig(level=logging.INFO)
 
-        
     def get_chat_completion(
         self,
         messages: list[dict],
@@ -19,7 +20,7 @@ class OpenAIService:
         max_tokens: int = 1000,
     ) -> Dict:
         """Handle chat completion requests."""
-        
+
         logging.info(f"Requesting chat completion with model {self.model} for {len(messages)} messages.")
 
         try:
@@ -43,9 +44,7 @@ class OpenAIService:
     ):
         """Stream chat completion tokens one by one."""
 
-        logging.info(
-            f"Requesting streaming chat completion with model {self.model} for {len(messages)} messages."
-        )
+        logging.info(f"Requesting streaming chat completion with model {self.model} for {len(messages)} messages.")
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -63,28 +62,26 @@ class OpenAIService:
                 f"OpenAI API error during streaming chat completion: {e}",
                 exc_info=True,
             )
-            raise
-            
+            raise e
+
     def transcribe_audio(self, audio_file_path: str) -> Optional[str]:
-        """Transcribe audio using Whisper.
+        """Transcribe audio using gpt-4o-mini-transcribe.
         Returns the transcribed text or empty string on error/cancel."""
-        
+
         logging.info(f"Transcribing audio file: {audio_file_path}")
         try:
-
             with open(audio_file_path, "rb") as audio_file:
                 result = self.client.audio.transcriptions.create(
-                    model="whisper-1",
+                    model="gpt-4o-mini-transcribe",
                     file=audio_file,
                     language="en",
-                    response_format="text"
-
+                    response_format="text",
                 )
-                
+
             logging.info("Audio transcribed successfully.")
             # The OpenAI client returns a Transcription object; extract the text
             return result.text if hasattr(result, "text") else str(result)
-                
+
         except Exception as e:
             logging.error(f"OpenAI API error during audio transcription: {e}", exc_info=True)
             raise

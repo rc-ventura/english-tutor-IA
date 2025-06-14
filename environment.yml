@@ -13,3 +13,4 @@ dependencies:
   - pip:
       - gradio==5.29.0
       - gradio-client==1.10.0
+      - pre-commit

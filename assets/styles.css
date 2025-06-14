@@ -1,0 +1,60 @@
+:root {
+  --primary-color: #7f5af0;
+  --secondary-color: #2cb67d;
+  --background-color: #16161a;
+  --surface-color: #242629;
+  --text-color: #fffffe;
+  --border-radius: 12px;
+}
+
+body, .gradio-container {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+#main-container {
+  max-width: 900px;
+  margin: auto;
+}
+
+.container {
+  background-color: var(--surface-color);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  box-shadow: 0 0 10px rgba(127, 90, 240, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+.container:hover {
+  box-shadow: 0 0 15px rgba(127, 90, 240, 0.3);
+}
+
+.gradio-button {
+  background: var(--primary-color);
+  color: var(--text-color);
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.gradio-button:hover {
+  background: #9a7dff;
+}
+
+.input-textbox, .dropdown-select {
+  background-color: var(--surface-color);
+  color: var(--text-color);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+}
+
+.chatbot-container {
+  background-color: var(--surface-color);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  padding: 0.5rem;
+  box-shadow: 0 0 8px rgba(127, 90, 240, 0.2);
+}

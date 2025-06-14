@@ -14,6 +14,9 @@ class BaseTutor(ABC):
 
     @abstractmethod
     def process_input(
-        self, input_data: Any, history: List[Dict], level: Optional[str] = None
+        self,
+        input_data: Any | None = None,
+        history: Optional[List[Dict]] = None,
+        level: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict], List[Dict]], None, None]:
         """Process user input and return chatbot messages and updated history."""

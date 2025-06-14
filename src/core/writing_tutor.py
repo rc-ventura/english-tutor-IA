@@ -7,7 +7,10 @@ from src.utils.audio import talker
 
 class WritingTutor(BaseTutor):
     def process_input(
-        self, input_data: Any, history: List[Dict], level: Optional[str] = None
+        self,
+        input_data: Any | None = None,
+        history: Optional[List[Dict]] = None,
+        level: Optional[str] = None,
     ) -> Generator[tuple[List[Dict], List[Dict]], None, None]:
         """Evaluate an essay and return updated chat history.
 
@@ -35,10 +38,20 @@ class WritingTutor(BaseTutor):
         try:
             assistant_message = {"role": "assistant", "content": ""}
             new_history.append(assistant_message)
+
+            reply_buffer = ""
             for chunk in self.openai_service.stream_chat_completion(messages=messages):
-                assistant_message["content"] += chunk
-                # Stream partial feedback to the UI
-                yield new_history, new_history
+                reply_buffer += chunk
+
+            try:
+                talker(reply_buffer)
+            except Exception as e:
+                logging.warning(f"TTS error for writing feedback: {e}", exc_info=True)
+                reply_buffer += " (Note: audio playback of feedback failed)"
+
+            assistant_message["content"] = reply_buffer
+            yield new_history, new_history
+
         except Exception as e:
             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
             new_history.append(
@@ -48,15 +61,6 @@ class WritingTutor(BaseTutor):
                 }
             )
             yield new_history, new_history
-            return
-
-        try:
-            talker(new_history[-1]["content"])
-        except Exception as e:
-            logging.warning(f"TTS error for writing feedback: {e}", exc_info=True)
-            new_history[-1]["content"] += " (Note: audio playback of feedback failed)"
-
-        yield new_history, new_history
 
     def generate_random_topic(self, level: Optional[str] = None, history: Optional[List[Dict]] = None):
         user_prompt_content = f"Generate a topic for a writing essay for a student with the level of {level}. Also, suggest structure and number of lines and number of words expectation."

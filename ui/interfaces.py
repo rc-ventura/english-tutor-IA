@@ -43,11 +43,27 @@ class GradioInterface:
             with gr.Sidebar():
                 gr.Image("./assets/sophia-ia.png", label="Sophia IA")
                 gr.Markdown("## English Tutor AI")
-                gr.Textbox(label="Api Key", value="")
-                gr.Dropdown(
+# 
+#                 gr.Textbox(label="Api Key", value="")
+#                 gr.Dropdown(
+#                     label="model",
+#                     choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
+#                     value="gpt-4o-mini",  # Default value for the dropdown
+
+                api_key_box = gr.Textbox(label="API Key", type="password")
+                set_key_btn = gr.Button("Set API Key")
+                api_key_status = gr.Markdown("")
+                model_dropdown = gr.Dropdown(
                     label="model",
                     choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                    value="gpt-4o-mini",  # Default value for the dropdown
+                    value=""  # Default value for the dropdown
+                )
+
+                set_key_btn.click(
+                    fn=self.tutor.set_api_key,
+                    inputs=[api_key_box],
+                    outputs=[api_key_status]
+
                 )
 
             with gr.Tab("Speaking Skills"):

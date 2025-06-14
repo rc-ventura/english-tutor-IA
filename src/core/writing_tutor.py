@@ -52,6 +52,23 @@ class WritingTutor(BaseTutor):
             assistant_message["content"] = reply_buffer
             yield new_history, new_history
 
+
+# 
+#             feedback = ""
+#             for chunk in self.openai_service.stream_chat_completion(messages=messages):
+#                 feedback += chunk
+#                 # Stream partial feedback to the UI
+#                 yield new_history + [{"role": "assistant", "content": feedback}], new_history
+#         except Exception as e:
+#             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
+#             yield [{"role": "assistant", "content": f"Sorry, I encountered an issue generating a response: {e}"}], history
+#             return
+
+#         new_history.append({"role": "assistant", "content": feedback})
+
+#         try:
+#             talker(new_history[-1]["content"])
+
         except Exception as e:
             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
             new_history.append(

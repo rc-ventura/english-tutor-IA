@@ -47,7 +47,7 @@ class GradioInterface:
                 gr.Dropdown(
                     label="model",
                     choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                    value="",  # Default value for the dropdown
+                    value="gpt-4o-mini",  # Default value for the dropdown
                 )
 
             with gr.Tab("Speaking Skills"):

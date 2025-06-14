@@ -27,7 +27,10 @@ class SpeakingTutor(BaseTutor):
         return history, history
 
     def process_input(
-        self, input_data: Any, history: List[Dict], level: Optional[str] = None
+        self,
+        input_data: Any | None = None,
+        history: Optional[List[Dict]] = None,
+        level: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict], List[Dict]], None, None]:
         """Generate assistant response from latest history.
 
@@ -35,6 +38,9 @@ class SpeakingTutor(BaseTutor):
         in real time. Each yielded value contains the current chat history to be
         displayed and the updated history state.
         """
+        # Gradio may pass the history as the first positional argument.
+        if history is None and isinstance(input_data, list):
+            history = input_data
 
         if not history or history[-1]["role"] != "user":
             yield history, history
@@ -45,25 +51,30 @@ class SpeakingTutor(BaseTutor):
 
         logging.info("Full prompt being sent to OpenAI:")
         logging.info({"system_prompt": system_prompt, "full_history": history})
+
         try:
             assistant_message = {"role": "assistant", "content": ""}
             history.append(assistant_message)
+
+            reply_buffer = ""
             for chunk in self.openai_service.stream_chat_completion(messages=messages):
-                assistant_message["content"] += chunk
-                yield history, history
+                reply_buffer += chunk
 
-        except Exception as e:
-            logging.error(f"OpenAI chat completion error: {e}", exc_info=True)
-            history[-1]["content"] = f"Sorry, I encountered an issue generating a response: {e}"
+            try:
+                talker(reply_buffer)
+            except Exception as e:
+                logging.warning(f"TTS error: {e}", exc_info=True)
+            reply_buffer += " (Note: audio playback of feedback failed)"
+
+            assistant_message["content"] = reply_buffer
             yield history, history
-            return
 
-        reply = history[-1]["content"]
-
-        try:
-            talker(reply)
         except Exception as e:
-            logging.warning(f"TTS error: {e}", exc_info=True)
-            history[-1]["content"] += " (Note: audio playback failed)"
-
-        yield history, history
+            logging.error("OpenAI chat completion error for speaking: %s", e, exc_info=True)
+            history.append(
+                {
+                    "role": "assistant",
+                    "content": f"Sorry, I encountered an issue generating a response: {e}",
+                }
+            )
+            yield history, history

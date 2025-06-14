@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>Um tutor de inglês inteligente que ajuda estudantes a melhorar suas habilidades de escrita e fala em inglês com feedback personalizado.</p>
-  
+
   [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
   [![OpenAI](https://img.shields.io/badge/OpenAI-API-412991.svg)](https://openai.com/)
   [![Gradio](https://img.shields.io/badge/Gradio-UI-FF4B4B.svg)](https://gradio.app/)

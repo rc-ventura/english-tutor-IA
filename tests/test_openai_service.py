@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.services.openai_service import OpenAIService
 
+
 class MockChunk:
     def __init__(self, content):
         delta = types.SimpleNamespace(content=content)

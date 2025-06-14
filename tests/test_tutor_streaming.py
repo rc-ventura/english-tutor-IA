@@ -1,11 +1,13 @@
-import types
 from unittest.mock import MagicMock, patch
-from src.core.writing_tutor import WritingTutor
+
 from src.core.speaking_tutor import SpeakingTutor
+from src.core.writing_tutor import WritingTutor
+
 
 class DummyParent:
-    def get_system_message(self, mode='writing', level=None):
-        return 'sys'
+    def get_system_message(self, mode="writing", level=None):
+        return "sys"
+
 
 def test_writing_tutor_process_input_streams():
     service = MagicMock()
@@ -15,6 +17,7 @@ def test_writing_tutor_process_input_streams():
         history = []
         gen = tutor.process_input("My essay", history, level="B1")
         import copy
+
         first = copy.deepcopy(next(gen))
         second = copy.deepcopy(next(gen))
         last = None
@@ -36,6 +39,7 @@ def test_writing_tutor_generate_random_topic_streams():
         history = []
         gen = tutor.generate_random_topic(level="B1", history=history)
         import copy
+
         first = copy.deepcopy(next(gen))
         second = copy.deepcopy(next(gen))
         last = None
@@ -54,6 +58,7 @@ def test_speaking_tutor_process_input_streams():
         history = [{"role": "user", "content": "Hello"}]
         gen = tutor.process_input(history, level="A1")
         import copy
+
         first = copy.deepcopy(next(gen))
         second = copy.deepcopy(next(gen))
         last = None
@@ -62,6 +67,6 @@ def test_speaking_tutor_process_input_streams():
     assert first[0][-1]["content"] == "Hi"
     assert second[0][-1]["content"] == "Hi there"
     assert last[0][-1]["content"] == "Hi there"
-        outputs = list(gen)
+    outputs = list(gen)
     assert outputs[0][0][-1]["content"] == "Hello"
     assert outputs[-1][0][-1]["content"] == "Hello world"

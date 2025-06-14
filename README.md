@@ -16,6 +16,7 @@
 - **Avaliação por Nível**: Feedback personalizado baseado no seu nível de inglês (1-10)
 - **Interface Intuitiva**: Fácil de usar com suporte a gravação de áudio
 - **Feedback Construtivo**: Dicas práticas para melhorar cada aspecto do seu inglês
+- **Respostas em streaming**: visualize o texto sendo gerado em tempo real
 
 ## 🛠️ Tecnologias
 

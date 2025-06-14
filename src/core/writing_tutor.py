@@ -6,11 +6,16 @@ import logging
 
 class WritingTutor(BaseTutor):
 
-    def process_input(self, essay_text: str, history: List[Dict], level: Optional[str] = None) -> tuple[List[Dict], List[Dict]]:
-        """Evaluate an essay and return updated chat history."""
+    def process_input(self, essay_text: str, history: List[Dict], level: Optional[str] = None):
+        """Evaluate an essay and return updated chat history.
+
+        This method now yields intermediate chat history states so that the
+        frontend can display streaming tokens as they are received from the
+        OpenAI API.
+        """
         if not essay_text or not essay_text.strip():
-            # Keep return type consistent for the Chatbot component
-            return [{"role": "assistant", "content": "No essay provided. Please write your essay."}], history
+            yield [{"role": "assistant", "content": "No essay provided. Please write your essay."}], history
+            return
         
 
 
@@ -21,21 +26,25 @@ class WritingTutor(BaseTutor):
         messages = [{"role": "system", "content": system_prompt}] + new_history
         
         try:
-            chunks = self.openai_service.stream_chat_completion(messages=messages)
-            feedback = "".join(chunk for chunk in chunks)
+            feedback = ""
+            for chunk in self.openai_service.stream_chat_completion(messages=messages):
+                feedback += chunk
+                # Stream partial feedback to the UI
+                yield new_history + [{"role": "assistant", "content": feedback}], new_history
         except Exception as e:
             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
-            return [{"role": "assistant", "content": f"Sorry, I encountered an issue generating a response: {e}"}], history
-        
+            yield [{"role": "assistant", "content": f"Sorry, I encountered an issue generating a response: {e}"}], history
+            return
+
         new_history.append({"role": "assistant", "content": feedback})
-        
+
         try:
             talker(feedback)
         except Exception as e:
             logging.warning(f"TTS error for writing feedback: {e}", exc_info=True)
             new_history[-1]["content"] += " (Note: audio playback of feedback failed)"
-        
-        return new_history, new_history
+
+        yield new_history, new_history
          
         
         

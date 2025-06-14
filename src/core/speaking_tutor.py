@@ -25,8 +25,13 @@ class SpeakingTutor(BaseTutor):
 
 
 
-    def process_input(self, history: List[Dict], level: Optional[str] = None) -> tuple[List[Dict[str, str]], List[Dict[str, str]]]:
-        """Generates assistant response from latest history."""
+    def process_input(self, history: List[Dict], level: Optional[str] = None):
+        """Generate assistant response from latest history.
+
+        The response is streamed token by token so that the frontend can update
+        in real time. Each yielded value contains the current chat history to be
+        displayed and the updated history state.
+        """
         
         if not history or history[-1]['role'] != 'user':
             return history, history 
@@ -40,21 +45,26 @@ class SpeakingTutor(BaseTutor):
             "full_history": history
         })
         try:
-            chunks = self.openai_service.stream_chat_completion(messages=messages)
-            reply = "".join(chunk for chunk in chunks)
+            assistant_message = {"role": "assistant", "content": ""}
+            history.append(assistant_message)
+            for chunk in self.openai_service.stream_chat_completion(messages=messages):
+                assistant_message["content"] += chunk
+                yield history, history
         except Exception as e:
             logging.error(f"OpenAI chat completion error: {e}", exc_info=True)
-            return f"Sorry, I encountered an issue generating a response: {e}", history
-        
-        history += [{"role": "assistant", "content": reply}]
-        
+            history[-1]["content"] = f"Sorry, I encountered an issue generating a response: {e}"
+            yield history, history
+            return
+
+        reply = history[-1]["content"]
+
         try:
             talker(reply)
         except Exception as e:
             logging.warning(f"TTS error: {e}", exc_info=True)
             history[-1]["content"] += " (Note: audio playback failed)"
 
-        return history, history
+        yield history, history
 
     
         

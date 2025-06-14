@@ -6,40 +6,53 @@ import logging
 
 class WritingTutor(BaseTutor):
 
-    def process_input(self, essay_text: str, history: List[Dict], level: Optional[str] = None) -> tuple[List[Dict], List[Dict]]:
-        """Evaluate an essay and return updated chat history."""
+    def process_input(self, essay_text: str, history: List[Dict], level: Optional[str] = None):
+        """Evaluate an essay and return updated chat history.
+
+        This method now yields intermediate chat history states so that the
+        frontend can display streaming tokens as they are received from the
+        OpenAI API.
+        """
         if not essay_text or not essay_text.strip():
-            # Keep return type consistent for the Chatbot component
-            return [{"role": "assistant", "content": "No essay provided. Please write your essay."}], history
+            yield [{"role": "assistant", "content": "No essay provided. Please write your essay."}], history
+            return
         
 
 
-        user_message_content = f"Please evaluate this essay for a {level} level student:\n\n{essay_text}"
+        user_message_content = (
+            f"Please evaluate this essay for a {level} level student:\n\n{essay_text}"
+        )
         new_history = history + [{"role": "user", "content": user_message_content}]
+        # Immediately show the user's essay in the chat
+        yield new_history, new_history
 
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)
         messages = [{"role": "system", "content": system_prompt}] + new_history
         
         try:
-            chunks = self.openai_service.stream_chat_completion(messages=messages)
-            feedback = "".join(chunk for chunk in chunks)
+            assistant_message = {"role": "assistant", "content": ""}
+            new_history.append(assistant_message)
+            for chunk in self.openai_service.stream_chat_completion(messages=messages):
+                assistant_message["content"] += chunk
+                # Stream partial feedback to the UI
+                yield new_history, new_history
         except Exception as e:
             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
-            return [{"role": "assistant", "content": f"Sorry, I encountered an issue generating a response: {e}"}], history
-        
-        new_history.append({"role": "assistant", "content": feedback})
-        
+            new_history.append({"role": "assistant", "content": f"Sorry, I encountered an issue generating a response: {e}"})
+            yield new_history, new_history
+            return
+
         try:
-            talker(feedback)
+            talker(new_history[-1]["content"])
         except Exception as e:
             logging.warning(f"TTS error for writing feedback: {e}", exc_info=True)
             new_history[-1]["content"] += " (Note: audio playback of feedback failed)"
-        
-        return new_history, new_history
+
+        yield new_history, new_history
          
         
         
-    def generate_random_topic(self, level: Optional[str] = None, history: Optional[List[Dict]] = None) -> tuple[List[Dict], List[Dict]]:
+    def generate_random_topic(self, level: Optional[str] = None, history: Optional[List[Dict]] = None):
         
         user_prompt_content = f"Generate a topic for a writing essay for a student with the level of {level}. Also, suggest structure and number of lines and number of words expectation."
         
@@ -50,33 +63,34 @@ class WritingTutor(BaseTutor):
             {"role": "user", "content": user_prompt_content}
         ]
 
+        new_history = history or []
+        user_entry = {
+            "role": "user",
+            "content": f"Can you give me an essay topic for level {level}?",
+        }
+        new_history = new_history + [user_entry]
+        # Immediately show the user request
+        yield new_history, new_history
+
         try:
-            chunks = self.openai_service.stream_chat_completion(
+            assistant_message = {"role": "assistant", "content": ""}
+            new_history.append(assistant_message)
+            for chunk in self.openai_service.stream_chat_completion(
                 messages=messages_for_topic
-            )
-            topic_suggestion = "".join(chunk for chunk in chunks)
+            ):
+                assistant_message["content"] += chunk
+                yield new_history, new_history
         except Exception as e:
             logging.error(f"Topic generation error: {e}", exc_info=True)
-            return [{"role": "assistant", "content": f"Sorry, I couldn't generate a topic right now: {e}"}], history
-        
-        
-        updated_history = history + [
-            {"role": "user", "content": f"Can you give me an essay topic for level {level}?"}, # Simplified user intent
-            {"role": "assistant", "content": topic_suggestion}
-        ]
-                 
+            new_history.append({
+                "role": "assistant",
+                "content": f"Sorry, I couldn't generate a topic right now: {e}",
+            })
+            yield new_history, new_history
+            return
 
-        generated_topic_output = [{"role": "assistant", "content": topic_suggestion}], updated_history
-         # Optional: TTS for the topic suggestion
-        # try:
-        #     talker(topic_suggestion)
-        # except Exception as e:
-        #     # logging.warning(f"TTS error for topic suggestion: {e}", exc_info=True)
-        #     pass # Don't alter return for this
-        
-        #talker(topic_suggestion)
-
-        return generated_topic_output
+        # Optional TTS commented out
+        yield new_history, new_history
 
         
 

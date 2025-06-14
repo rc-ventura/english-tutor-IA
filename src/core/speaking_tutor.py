@@ -45,6 +45,20 @@ class SpeakingTutor(BaseTutor):
             "full_history": history
         })
         try:
+            assistant_message = {"role": "assistant", "content": ""}
+            history.append(assistant_message)
+            for chunk in self.openai_service.stream_chat_completion(messages=messages):
+                assistant_message["content"] += chunk
+                yield history, history
+        except Exception as e:
+            logging.error(f"OpenAI chat completion error: {e}", exc_info=True)
+            history[-1]["content"] = f"Sorry, I encountered an issue generating a response: {e}"
+            yield history, history
+            return
+
+        reply = history[-1]["content"]
+
+
             reply = ""
             for chunk in self.openai_service.stream_chat_completion(messages=messages):
                 reply += chunk

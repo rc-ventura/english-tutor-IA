@@ -62,3 +62,6 @@ def test_speaking_tutor_process_input_streams():
     assert first[0][-1]["content"] == "Hi"
     assert second[0][-1]["content"] == "Hi there"
     assert last[0][-1]["content"] == "Hi there"
+        outputs = list(gen)
+    assert outputs[0][0][-1]["content"] == "Hello"
+    assert outputs[-1][0][-1]["content"] == "Hello world"

@@ -64,7 +64,7 @@ class SpeakingTutor(BaseTutor):
                 talker(reply_buffer)
             except Exception as e:
                 logging.warning(f"TTS error: {e}", exc_info=True)
-            reply_buffer += " (Note: audio playback of feedback failed)"
+                reply_buffer += " (Note: audio playback of feedback failed)"
 
             assistant_message["content"] = reply_buffer
             yield history, history

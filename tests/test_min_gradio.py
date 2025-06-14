@@ -1,9 +1,12 @@
 import gradio as gr
 
+
 def echo(x):
     return x
 
+
 def main():
+    """Build and return the Gradio demo."""
     with gr.Blocks() as demo:
         with gr.Tab("Speaking Skills"):
             gr.Markdown("### Practice your speaking and get AI feedback")
@@ -37,7 +40,12 @@ def main():
             with gr.Row():
                 evaluate_btn = gr.Button("Evaluate", variant="primary")
                 clear_writing = gr.Button("Clear", variant="secondary")
-    demo.launch()
+    return demo
+
+def test_echo():
+    assert echo("hi") == "hi"
+
 
 if __name__ == "__main__":
-    main()
+    demo = main()
+    demo.launch()

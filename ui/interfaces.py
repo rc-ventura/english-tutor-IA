@@ -1,3 +1,7 @@
+import gradio as gr
+from pathlib import Path
+
+
 from typing import TYPE_CHECKING
 
 import gradio as gr
@@ -15,26 +19,10 @@ class GradioInterface:
     def create_interface(self):
         """Create and configure the Gradio interface."""
 
-        css = """
-            .container {
-                border: 2px solid #9c27b0 !important;
-                border-radius: 15px !important;
-                padding: 15px !important;
-                box-shadow: 0 4px 8px rgba(156, 39, 176, 0.2) !important;
-                transition: all 0.3s ease !important;
-            }
+        css_path = Path("assets/styles.css")
+        css = css_path.read_text()
 
-            .container:hover {
-                box-shadow: 0 6px 12px rgba(156, 39, 176, 0.3) !important;
-            }
-
-            .gradio-button {
-                border-radius: 8px !important;
-                width: 50% !important;
-            }
-        """
-
-        with gr.Blocks(css=css, theme=gr.themes.Soft()) as demo:
+        with gr.Blocks(css=css, theme=gr.themes.Soft(), elem_id="main-container") as demo:
             # State
             history_speaking = gr.State([])
             history_writing = gr.State([])
@@ -43,28 +31,20 @@ class GradioInterface:
             with gr.Sidebar():
                 gr.Image("./assets/sophia-ia.png", label="Sophia IA")
                 gr.Markdown("## English Tutor AI")
-# 
-#                 gr.Textbox(label="Api Key", value="")
-#                 gr.Dropdown(
-#                     label="model",
-#                     choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-#                     value="gpt-4o-mini",  # Default value for the dropdown
-
-                api_key_box = gr.Textbox(label="API Key", type="password")
-                set_key_btn = gr.Button("Set API Key")
-                api_key_status = gr.Markdown("")
+                api_key_box = gr.Textbox(
+                    label="API Key", type="password", elem_classes="input-textbox", elem_id="api-key"
+                )
+                set_key_btn = gr.Button("Set API Key", elem_classes="gradio-button", elem_id="set-key")
+                api_key_status = gr.Markdown("", elem_id="api-status")
                 model_dropdown = gr.Dropdown(
                     label="model",
                     choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                    value=""  # Default value for the dropdown
+                    value="",
+                    elem_classes="dropdown-select",
+                    elem_id="model-select",
                 )
 
-                set_key_btn.click(
-                    fn=self.tutor.set_api_key,
-                    inputs=[api_key_box],
-                    outputs=[api_key_status]
-
-                )
+                set_key_btn.click(fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[api_key_status])
 
             with gr.Tab("Speaking Skills"):
                 # ... (chatbot, entry, mic components)
@@ -72,13 +52,15 @@ class GradioInterface:
                     label="Speaking Conversation",
                     height=500,
                     type="messages",
-                    elem_classes="container",
+                    elem_classes="chatbot-container",
+                    elem_id="chatbot-speaking",
                 )
                 audio_input_mic = gr.Audio(
                     sources=["microphone"],
                     type="filepath",
                     label="Record your voice",
                     elem_classes="container",
+                    elem_id="mic-input",
                 )
 
                 # Speaking Event Handler (for microphone)
@@ -103,14 +85,19 @@ class GradioInterface:
                     level_dropdown_writing = gr.Dropdown(
                         label="Select English Level",
                         choices=["A1", "A2", "B1", "B2", "C1", "C2"],
-                        value="B1",  # Default value for the dropdown
+                        value="B1",
+                        elem_classes="dropdown-select",
+                        elem_id="level-select",
                     )
                     with gr.Column():
-                        generate_topic_btn = gr.Button("Generate Essay Topic", elem_classes="gradio-button")
+                        generate_topic_btn = gr.Button(
+                            "Generate Essay Topic", elem_classes="gradio-button", elem_id="generate-topic"
+                        )
                         evaluate_essay_btn = gr.Button(
                             "Evaluate My Essay",
                             variant="primary",
                             elem_classes="gradio-button",
+                            elem_id="evaluate-essay",
                         )
 
                 with gr.Column():
@@ -119,12 +106,15 @@ class GradioInterface:
                             label="Your Essay",
                             lines=25,
                             placeholder="Write your essay here...",
+                            elem_classes="input-textbox",
+                            elem_id="essay-text",
                         )
                         chatbot_writing = gr.Chatbot(
                             label="Writing Feedback",
                             height=600,
                             type="messages",
-                            elem_classes="container",
+                            elem_classes="chatbot-container",
+                            elem_id="chatbot-writing",
                         )
 
                 generate_topic_btn.click(

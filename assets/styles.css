@@ -50,15 +50,11 @@ body,
   color: var(--body-text-color, #ffffff);
   border: none;
   border-radius: var(--border-radius);
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   cursor: pointer;
-  width: 100%;
-}
-
-@media (min-width: 768px) {
-  .gradio-button {
-    width: 50%;
-  }
+  width: auto;
+  max-width: 200px;
+  margin: 0.25rem;
 }
 
 .gradio-button:hover {
@@ -128,12 +124,13 @@ body,
 }
 
 #writing-buttons .gradio-button {
-  width: 100%;
+  flex: 1 1 calc(50% - 1rem);
+  max-width: 160px;
 }
 
 @media (min-width: 768px) {
   #writing-buttons .gradio-button {
-    width: 24%;
+    flex: 1 1 calc(25% - 1rem);
   }
 }
 

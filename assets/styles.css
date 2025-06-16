@@ -102,7 +102,7 @@ body,
   gap: 1rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 760px) {
   #writing-row {
     flex-direction: row;
     flex-wrap: wrap;
@@ -111,9 +111,17 @@ body,
 
 #essay-text,
 #chatbot-writing {
-  flex: 1 1 200px;
-  width: min(400px, 100%);
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
+}
+
+@media (min-width: 760px) {
+  #essay-text,
+  #chatbot-writing {
+    flex: 1 1 0;
+    width: auto;
+  }
 }
 
 #writing-buttons {
@@ -121,14 +129,22 @@ body,
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: center;
+  align-items: center;
 }
 
 #writing-buttons .gradio-button {
   flex: 1 1 calc(50% - 1rem);
-  max-width: 160px;
+  max-width: 140px;
 }
 
-@media (min-width: 768px) {
+@media (max-width: 480px) {
+  #writing-buttons .gradio-button {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+}
+
+@media (min-width: 760px) {
   #writing-buttons .gradio-button {
     flex: 1 1 calc(25% - 1rem);
   }

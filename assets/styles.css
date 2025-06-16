@@ -124,6 +124,15 @@ body,
   }
 }
 
+@media (min-width: 760px) and (max-width: 1220px) {
+  #essay-text {
+    flex: 2 1 60%;
+  }
+  #chatbot-writing {
+    flex: 1 1 40%;
+  }
+}
+
 #writing-buttons {
   display: flex;
   flex-wrap: wrap;

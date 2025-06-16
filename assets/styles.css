@@ -1,24 +1,13 @@
 :root {
   --primary-color: #7f5af0;
   --secondary-color: #2cb67d;
-  --background-color: #16161a;
-  --surface-color: #242629;
-  --text-color: #fffffe;
   --border-radius: 12px;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --background-color: #ffffff;
-    --surface-color: #f2f2f2;
-    --text-color: #16161a;
-  }
 }
 
 body,
 .gradio-container {
-  background-color: var(--background-color);
-  color: var(--text-color);
+  background-color: var(--background-fill-primary, #ffffff);
+  color: var(--body-text-color, #000000);
   font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -28,7 +17,7 @@ body,
 }
 
 .container {
-  background-color: var(--surface-color);
+  background-color: var(--background-fill-secondary, #f7f7f7);
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
   padding: 1rem;
@@ -42,7 +31,7 @@ body,
 
 .gradio-button {
   background: var(--primary-color);
-  color: var(--text-color);
+  color: var(--body-text-color, #ffffff);
   border: none;
   border-radius: var(--border-radius);
   padding: 0.5rem 1rem;
@@ -62,15 +51,15 @@ body,
 
 .input-textbox,
 .dropdown-select {
-  background-color: var(--surface-color);
-  color: var(--text-color);
+  background-color: var(--background-fill-secondary, #ffffff);
+  color: var(--body-text-color, #000000);
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
   width: 100%;
 }
 
 .chatbot-container {
-  background-color: var(--surface-color);
+  background-color: var(--background-fill-secondary, #ffffff);
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
   padding: 0.5rem;
@@ -84,18 +73,6 @@ body,
   border: none;
 }
 
-.avatar-image img {
-  width: 100px;
-  max-width: 100%;
-  height: auto;
-  border-radius: 50%;
-  object-fit: cover;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-/* Avatar image styling */
 .avatar-image img {
   width: 120px;
   max-width: 100%;

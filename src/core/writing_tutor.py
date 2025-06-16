@@ -2,7 +2,6 @@ import logging
 from typing import Any, Dict, Generator, List, Optional
 
 from src.core.base_tutor import BaseTutor
-from src.utils.audio import talker
 
 
 class WritingTutor(BaseTutor):
@@ -24,12 +23,13 @@ class WritingTutor(BaseTutor):
                     "role": "assistant",
                     "content": "No essay provided. Please write your essay.",
                 }
-            ], history
+            ], history or []
             return
 
         user_message_content = f"Please evaluate this essay for a {level} level student:\n\n{input_data}"
-        new_history = history + [{"role": "user", "content": user_message_content}]
+        new_history = (history or []) + [{"role": "user", "content": user_message_content}]
         # Immediately show the user's essay in the chat
+
         yield new_history, new_history
 
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)
@@ -40,17 +40,17 @@ class WritingTutor(BaseTutor):
             new_history.append(assistant_message)
 
             reply_buffer = ""
+            token_threshold = 10
+            token_count_since_last_yield = 0
+
             for chunk in self.openai_service.stream_chat_completion(messages=messages):
                 reply_buffer += chunk
+                assistant_message["content"] = reply_buffer
+                token_count_since_last_yield += len(chunk)
 
-            try:
-                talker(reply_buffer)
-            except Exception as e:
-                logging.warning(f"TTS error for writing feedback: {e}", exc_info=True)
-                reply_buffer += " (Note: audio playback of feedback failed)"
-
-            assistant_message["content"] = reply_buffer
-            yield new_history, new_history
+                if token_count_since_last_yield >= token_threshold:
+                    yield new_history, new_history
+                    token_count_since_last_yield = 0
 
         except Exception as e:
             logging.error(f"OpenAI chat completion error for writing: {e}", exc_info=True)
@@ -100,8 +100,3 @@ class WritingTutor(BaseTutor):
 
         # Optional TTS commented out
         yield new_history, new_history
-
-    def register_essay(self, text: str, history: List[Dict], level: str) -> tuple[str, List[Dict]]:
-        new_history = history.copy()
-        new_history.append({"role": "user", "content": f"Level: {level}: {text}"})
-        return " ", new_history

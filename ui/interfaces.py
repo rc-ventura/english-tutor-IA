@@ -29,22 +29,30 @@ class GradioInterface:
             level = gr.State("B1")  # default level
 
             with gr.Sidebar():
-                gr.Image("./assets/sophia-ia.png", label="Sophia IA")
-                gr.Markdown("## English Tutor AI")
+                gr.Image(
+                    "./assets/sophia-ia.png", label="English Tutor AI", elem_classes="avatar-image", container=False
+                )
+
+                gr.Markdown("## Sophia AI", elem_id="title")
+
                 api_key_box = gr.Textbox(
                     label="API Key", type="password", elem_classes="input-textbox", elem_id="api-key"
                 )
-                set_key_btn = gr.Button("Set API Key", elem_classes="gradio-button", elem_id="set-key")
-                api_key_status = gr.Markdown("", elem_id="api-status")
-                model_dropdown = gr.Dropdown(
-                    label="model",
-                    choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                    value="",
-                    elem_classes="dropdown-select",
-                    elem_id="model-select",
-                )
+                with gr.Row():
+                    set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
+                    clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
 
-                set_key_btn.click(fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[api_key_status])
+                with gr.Row():
+                    model_dropdown = gr.Dropdown(
+                        label="model",
+                        choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
+                        value="",
+                        elem_classes="dropdown-select",
+                        elem_id="model-select",
+                    )
+
+                set_key_btn.click(fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[api_key_box])
+                clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
 
             with gr.Tab("Speaking Skills"):
                 # ... (chatbot, entry, mic components)
@@ -52,6 +60,8 @@ class GradioInterface:
                     label="Speaking Conversation",
                     height=500,
                     type="messages",
+                    show_copy_button=True,
+                    autoscroll=True,
                     elem_classes="chatbot-container",
                     elem_id="chatbot-speaking",
                 )
@@ -89,19 +99,15 @@ class GradioInterface:
                         elem_classes="dropdown-select",
                         elem_id="level-select",
                     )
-                    with gr.Column():
-                        generate_topic_btn = gr.Button(
-                            "Generate Essay Topic", elem_classes="gradio-button", elem_id="generate-topic"
-                        )
-                        evaluate_essay_btn = gr.Button(
-                            "Evaluate My Essay",
-                            variant="primary",
-                            elem_classes="gradio-button",
-                            elem_id="evaluate-essay",
-                        )
+
+                with gr.Row():
+                    generate_topic_btn = gr.Button(
+                        "Start",
+                        elem_classes="gradio-button",
+                    )
 
                 with gr.Column():
-                    with gr.Row():
+                    with gr.Row(elem_id="writing-row"):
                         essay_input_text = gr.Textbox(
                             label="Your Essay",
                             lines=25,
@@ -109,13 +115,36 @@ class GradioInterface:
                             elem_classes="input-textbox",
                             elem_id="essay-text",
                         )
+
                         chatbot_writing = gr.Chatbot(
                             label="Writing Feedback",
                             height=600,
                             type="messages",
                             elem_classes="chatbot-container",
                             elem_id="chatbot-writing",
+                            show_copy_button=True,
+                            autoscroll=True,
                         )
+
+                    with gr.Row():
+                        with gr.Row():
+                            evaluate_essay_btn = gr.Button(
+                                "Evaluate My Essay",
+                                variant="primary",
+                                elem_classes="gradio-button",
+                                elem_id="evaluate-essay-btn",
+                            )
+                            clear_writing_btn = gr.Button(
+                                "Clear", elem_classes="gradio-button", elem_id="clear-essay-btn"
+                            )
+                        with gr.Column():
+                            with gr.Row():
+                                play_audio_btn = gr.Button(
+                                    "Play Audio", elem_classes="gradio-button", elem_id="play-audio-btn"
+                                )
+                                clear_chatbot_btn = gr.Button(
+                                    "Clear", elem_classes="gradio-button", elem_id="clear-chatbot-btn"
+                                )
 
                 generate_topic_btn.click(
                     fn=self.tutor.writing_tutor.generate_random_topic,
@@ -137,6 +166,8 @@ class GradioInterface:
                         history_writing,
                     ],  # Feedback in chatbot, history updated
                 )
+
+                clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
 
         return demo
 

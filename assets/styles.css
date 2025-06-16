@@ -159,8 +159,9 @@ body,
   }
 }
 
-.form svelte-633qhp {
-  min-width: min(450px, 100%);
+.form.svelte-633qhp {
+  width: 100%;
+  min-width: 0;
 }
 
 /*dropbox-level-select*/

@@ -126,25 +126,22 @@ class GradioInterface:
                             autoscroll=True,
                         )
 
-                    with gr.Row():
-                        with gr.Row():
-                            evaluate_essay_btn = gr.Button(
-                                "Evaluate My Essay",
-                                variant="primary",
-                                elem_classes="gradio-button",
-                                elem_id="evaluate-essay-btn",
-                            )
-                            clear_writing_btn = gr.Button(
-                                "Clear", elem_classes="gradio-button", elem_id="clear-essay-btn"
-                            )
-                        with gr.Column():
-                            with gr.Row():
-                                play_audio_btn = gr.Button(
-                                    "Play Audio", elem_classes="gradio-button", elem_id="play-audio-btn"
-                                )
-                                clear_chatbot_btn = gr.Button(
-                                    "Clear", elem_classes="gradio-button", elem_id="clear-chatbot-btn"
-                                )
+                    with gr.Row(elem_id="writing-buttons"):
+                        evaluate_essay_btn = gr.Button(
+                            "Evaluate My Essay",
+                            variant="primary",
+                            elem_classes="gradio-button",
+                            elem_id="evaluate-essay-btn",
+                        )
+                        clear_writing_btn = gr.Button(
+                            "Clear", elem_classes="gradio-button", elem_id="clear-essay-btn"
+                        )
+                        play_audio_btn = gr.Button(
+                            "Play Audio", elem_classes="gradio-button", elem_id="play-audio-btn"
+                        )
+                        clear_chatbot_btn = gr.Button(
+                            "Clear", elem_classes="gradio-button", elem_id="clear-chatbot-btn"
+                        )
 
                 generate_topic_btn.click(
                     fn=self.tutor.writing_tutor.generate_random_topic,

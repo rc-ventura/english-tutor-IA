@@ -11,6 +11,22 @@ body,
   font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
+@media (prefers-color-scheme: light) {
+  body,
+  .gradio-container {
+    background-color: #fdfdfd;
+    color: #000;
+  }
+
+  .container,
+  .input-textbox,
+  .dropdown-select,
+  .chatbot-container {
+    background-color: #ffffff;
+    color: #000;
+  }
+}
+
 #main-container {
   max-width: 900px;
   margin: auto;
@@ -102,6 +118,23 @@ body,
   flex: 1 1 200px;
   width: min(400px, 100%);
   min-width: 0;
+}
+
+#writing-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+#writing-buttons .gradio-button {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  #writing-buttons .gradio-button {
+    width: 24%;
+  }
 }
 
 .form svelte-633qhp {

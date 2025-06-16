@@ -52,11 +52,12 @@ class SpeakingTutor(BaseTutor):
         logging.info("Full prompt being sent to OpenAI:")
         logging.info({"system_prompt": system_prompt, "full_history": history})
 
-        try:
-            assistant_message = {"role": "assistant", "content": ""}
-            history.append(assistant_message)
+        assistant_message = {"role": "assistant", "content": ""}
+        history.append(assistant_message)
 
-            reply_buffer = ""
+        reply_buffer = ""
+
+        try:
             for chunk in self.openai_service.stream_chat_completion(messages=messages):
                 reply_buffer += chunk
 

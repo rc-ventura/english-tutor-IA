@@ -11,22 +11,6 @@ body,
   font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
-@media (prefers-color-scheme: light) {
-  body,
-  .gradio-container {
-    background-color: #fdfdfd;
-    color: #000;
-  }
-
-  .container,
-  .input-textbox,
-  .dropdown-select,
-  .chatbot-container {
-    background-color: #ffffff;
-    color: #000;
-  }
-}
-
 #main-container {
   max-width: 900px;
   margin: auto;
@@ -98,8 +82,20 @@ body,
 
 #writing-row {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 1rem;
+  max-width: 300px;
+}
+
+/* #evaluate-essay-btn {
+  flex: 1 1 calc(50% - 1rem);
+} */
+
+#writing-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
 }
 
 @media (min-width: 760px) {
@@ -161,7 +157,7 @@ body,
 
 .form.svelte-633qhp {
   width: 100%;
-  min-width: 0 !important;
+  min-width: min(360px, 100%) !important;
 }
 
 /*dropbox-level-select*/

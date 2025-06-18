@@ -105,8 +105,12 @@ class GradioInterface:
                         "Start",
                         elem_classes="gradio-button",
                     )
-                    play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
-                    clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
+                    evaluate_essay_btn = gr.Button(
+                        "Evaluate",
+                        variant="primary",
+                        elem_classes="gradio-button",
+                        elem_id="evaluate-essay-btn",
+                    )
 
                 with gr.Column():
                     with gr.Row(elem_id="writing-row"):
@@ -129,12 +133,8 @@ class GradioInterface:
                         )
 
                     with gr.Row(elem_id="writing-buttons"):
-                        evaluate_essay_btn = gr.Button(
-                            "Evaluate My Essay",
-                            variant="primary",
-                            elem_classes="gradio-button",
-                            elem_id="evaluate-essay-btn",
-                        )
+                        play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
+                        clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
 
                 generate_topic_btn.click(
                     fn=self.tutor.writing_tutor.generate_random_topic,

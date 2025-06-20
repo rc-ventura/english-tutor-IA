@@ -16,6 +16,14 @@ class GradioInterface:
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
 
+    def set_api_key_ui(self, api_key: str):
+        """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
+        try:
+            self.tutor.set_api_key(api_key)
+            return gr.Success("API key set successfully!")
+        except ValueError as e:
+            return gr.Error(str(e))
+
     def create_interface(self):
         """Create and configure the Gradio interface."""
 
@@ -51,7 +59,7 @@ class GradioInterface:
                         elem_id="model-select",
                     )
 
-                set_key_btn.click(fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[api_key_box])
+                set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
                 clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
 
             with gr.Tab("Speaking Skills"):
@@ -72,19 +80,18 @@ class GradioInterface:
                     elem_classes="container",
                     elem_id="mic-input",
                 )
-
-                # Speaking Event Handler (for microphone)
+                # Chained event handler for the speaking tutor
+                # 1. User stops recording -> transcribe audio and update history
                 audio_input_mic.stop_recording(
-                    fn=self.tutor.speaking_tutor.transcribe_audio_only,
-                    inputs=[
-                        audio_input_mic,
-                        history_speaking,
-                    ],  # Pass level explicitly or via a shared state/dropdown
+                    fn=self.tutor.speaking_tutor.handle_transcription,
+                    inputs=[audio_input_mic, history_speaking],
                     outputs=[chatbot_speaking, history_speaking],
+                    # 2. After transcription -> get bot response, play audio, and update history
                 ).then(
-                    fn=self.tutor.speaking_tutor.process_input,
-                    inputs=[history_speaking],
-                    outputs=[chatbot_speaking, history_speaking],
+                    fn=self.tutor.speaking_tutor.handle_bot_response,
+                    inputs=[history_speaking, level],
+                    outputs=[chatbot_speaking, history_speaking],  # Removida referência ao debug_textbox
+                    # 3. After bot responds -> clear the audio input component
                 ).then(
                     fn=lambda: None, inputs=None, outputs=[audio_input_mic]
                 )

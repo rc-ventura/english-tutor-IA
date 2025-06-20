@@ -11,17 +11,15 @@
 
 ## ✨ Funcionalidades
 
-- **Avaliação de Escrita**: Receba feedback detalhado sobre sua redação em inglês
-- **Correção Gramatical**: Identificação e correção de erros gramaticais
-- **Avaliação por Nível**: Feedback personalizado baseado no seu nível de inglês (1-10)
-- **Interface Intuitiva**: Fácil de usar com suporte a gravação de áudio
-- **Feedback Construtivo**: Dicas práticas para melhorar cada aspecto do seu inglês
-- **Respostas em streaming**: visualize o texto sendo gerado em tempo real
+- **Avaliação de Escrita (Writing Tutor)**: Receba feedback detalhado sobre sua redação em inglês, correção gramatical e dicas construtivas, com respostas em streaming.
+- **Prática de Conversação (Speaking Tutor)**: Participe de uma conversa interativa em inglês. Você fala, o tutor transcreve sua fala e responde com texto e áudio (reproduzido automaticamente), permitindo uma prática de conversação fluida.
+- **Avaliação por Nível**: Feedback e interações personalizadas baseado no seu nível de inglês (1-10).
+- **Interface Intuitiva**: Fácil de usar com suporte a gravação de áudio para o Speaking Tutor.
 
 ## 🛠️ Tecnologias
 
 - **Python 3.8+** - Linguagem principal
-- **OpenAI API** - Para processamento de linguagem natural e transcrição de áudio
+- **OpenAI API** - Para processamento de linguagem natural, transcrição de áudio (Whisper) e geração de respostas multimodais (texto e áudio com GPT-4o).
 - **Gradio** - Interface web interativa
 - **Pydub** - Processamento de áudio
 - **Poetry** - Gerenciamento de dependências
@@ -88,9 +86,12 @@ English-Tutor-AI/
    - Digite ou cole seu texto em inglês
    - Receba feedback detalhado e uma nota de 0 a 10
 
-2. **Modo Fala**:
-   - Grave um áudio com sua fala em inglês
-   - Receba transcrição e feedback de pronúncia
+2. **Modo Conversação (Speaking Tutor)**:
+   - Selecione seu nível de inglês.
+   - Grave um áudio com sua fala em inglês.
+   - Sua fala será transcrita e exibida no chat.
+   - O tutor responderá com uma mensagem de texto e áudio, que será reproduzido automaticamente.
+   - Continue a conversa gravando novas mensagens de áudio.
 
 ## 🤝 Contribuição
 

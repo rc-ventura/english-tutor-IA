@@ -149,6 +149,10 @@ class GradioInterface:
                         play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
                         clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
 
+                audio_output_writing = gr.Audio(
+                    visible=False, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
+                )
+
                 generate_topic_btn.click(
                     fn=self.tutor.writing_tutor.generate_random_topic,
                     inputs=[
@@ -169,11 +173,11 @@ class GradioInterface:
                         history_writing,
                     ],  # Feedback in chatbot, history updated
                 )
-                # play_audio_btn.click(
-                #     fn=self.tutor.writing_tutor.play_audio,
-                #     inputs=[history_writing],  # Pass the history state
-                #     outputs=[audio_output_writing],  # Output to the invisible audio component
-                # )
+                play_audio_btn.click(
+                    fn=self.tutor.writing_tutor.play_audio,
+                    inputs=[history_writing],  # Pass the history state
+                    outputs=[audio_output_writing],  # Output to the invisible audio component
+                )
 
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
 

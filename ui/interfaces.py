@@ -50,14 +50,14 @@ class GradioInterface:
                     set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
                     clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
 
-                with gr.Row():
-                    model_dropdown = gr.Dropdown(
-                        label="model",
-                        choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                        value="",
-                        elem_classes="dropdown-select",
-                        elem_id="model-select",
-                    )
+                # with gr.Row():
+                #     model_dropdown = gr.Dropdown(
+                #         label="model",
+                #         choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
+                #         value="",
+                #         elem_classes="dropdown-select",
+                #         elem_id="model-select",
+                #     )
 
                 set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
                 clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
@@ -80,20 +80,25 @@ class GradioInterface:
                     elem_classes="container",
                     elem_id="mic-input",
                 )
+                audio_output_speaking = gr.Audio(
+                    visible=False, autoplay=True, label="Bot Speech Output", elem_id="audio-output-speaking"
+                )
                 # Chained event handler for the speaking tutor
                 # 1. User stops recording -> transcribe audio and update history
                 audio_input_mic.stop_recording(
                     fn=self.tutor.speaking_tutor.handle_transcription,
-                    inputs=[audio_input_mic, history_speaking],
+                    inputs=[history_speaking, audio_input_mic, level],
                     outputs=[chatbot_speaking, history_speaking],
-                    # 2. After transcription -> get bot response, play audio, and update history
                 ).then(
+                    # 2. After transcription -> get bot response (updates history with text) and audio path
                     fn=self.tutor.speaking_tutor.handle_bot_response,
                     inputs=[history_speaking, level],
-                    outputs=[chatbot_speaking, history_speaking],  # Removida referência ao debug_textbox
-                    # 3. After bot responds -> clear the audio input component
+                    outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
                 ).then(
-                    fn=lambda: None, inputs=None, outputs=[audio_input_mic]
+                    # 3. After bot responds -> clear the audio input component
+                    fn=lambda: None,
+                    inputs=None,
+                    outputs=[audio_input_mic],
                 )
 
             with gr.Tab("Writing Skills"):
@@ -106,6 +111,7 @@ class GradioInterface:
                         elem_classes="dropdown-select",
                         elem_id="level-select",
                     )
+                    # audio_output_writing = gr.Audio(visible=True, autoplay=False, elem_id="audio-output-writing")
 
                 with gr.Row(elem_id="writing-button-row"):
                     generate_topic_btn = gr.Button(
@@ -163,6 +169,11 @@ class GradioInterface:
                         history_writing,
                     ],  # Feedback in chatbot, history updated
                 )
+                # play_audio_btn.click(
+                #     fn=self.tutor.writing_tutor.play_audio,
+                #     inputs=[history_writing],  # Pass the history state
+                #     outputs=[audio_output_writing],  # Output to the invisible audio component
+                # )
 
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
 

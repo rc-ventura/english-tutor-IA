@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from src.core.base_tutor import BaseTutor
+from src.utils.audio import save_audio_to_temp_file
 
 
 class WritingTutor(BaseTutor):
@@ -69,3 +70,42 @@ class WritingTutor(BaseTutor):
         ]
 
         yield from self._stream_response_to_history(messages_for_topic, current_history)
+
+    def play_audio(self, history: List[Dict[str, str]]) -> str | None:
+        """
+        Takes the last assistant message from the history, converts it to speech,
+        and returns the path to the audio file for Gradio to play.
+        """
+        if not history or not isinstance(history, list):
+            logging.warning("play_audio called with empty or invalid history.")
+            return None
+
+        last_assistant_message = next((m for m in reversed(history) if m.get("role") == "assistant"), None)
+
+        if not last_assistant_message:
+            logging.info("No assistant message found in history, no audio to play.")
+            return None
+
+        text_to_speak = last_assistant_message.get("content")
+        if not text_to_speak:
+            logging.warning("Assistant message is empty, nothing to speak.")
+            return None
+
+        if not self.openai_service:
+            logging.error("OpenAI service not available in WritingTutor for text-to-speech.")
+            return None
+
+        try:
+            logging.info(f"Generating audio for feedback: '{text_to_speak[:70]}...'")
+            audio_bytes = self.openai_service.text_to_speech(text_to_speak)
+
+            # Use the new utility function to save the audio to a temporary file
+            tmp_path = save_audio_to_temp_file(audio_bytes)
+
+            return tmp_path
+
+        except Exception as e:
+            logging.error(f"Failed to generate or save audio feedback: {e}", exc_info=True)
+            return None
+            logging.error(f"Failed to generate or save audio feedback: {e}", exc_info=True)
+            return None

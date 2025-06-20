@@ -6,7 +6,7 @@ from src.core.base_tutor import BaseTutor
 from src.utils.audio import (
     extract_audio_from_response,
     extract_text_from_response,
-    play_audio,
+    save_audio_to_temp_file,
 )
 
 _logger = logging.getLogger(__name__)
@@ -42,20 +42,32 @@ class SpeakingTutor(BaseTutor):
 
     def handle_transcription(
         self,
-        audio_file_path: Optional[str],
         history: Optional[List[Dict[str, Any]]],
+        audio_filepath: Optional[str] = None,
+        level: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Transcribes user audio, adds it to history, and returns the updated history for chatbot and state."""
         current_history = history.copy() if history else []
-        _logger.info(f"handle_transcription: Start. audio_file_path='{audio_file_path}'")
+        _logger.info(f"handle_transcription: Start. Received audio: {audio_filepath}, Level: {level}")
 
-        if not audio_file_path:
-            _logger.warning("No audio file path provided.")
+        if not audio_filepath:
+            _logger.error("No audio filepath provided to handle_transcription.")
+            # Attempt to add an error message to the chat history
+            # This might not be the best place if history is not reliably passed or returned
+            # but let's try for now.
+            error_message = {
+                "role": "assistant",
+                "content": "Error: No audio data was recorded or sent. Please try again.",
+            }
+            if isinstance(current_history, list):
+                current_history.append(error_message)
+            else:  # Should not happen if type hints are followed
+                current_history = [error_message]
             return current_history, current_history
 
         try:
-            _logger.info(f"Transcribing audio from '{audio_file_path}'...")
-            user_transcribed_text = self.openai_service.transcribe_audio(audio_file_path)
+            _logger.info(f"Transcribing audio from '{audio_filepath}'...")
+            user_transcribed_text = self.openai_service.transcribe_audio(audio_filepath)
             if not user_transcribed_text or not user_transcribed_text.strip():
                 user_transcribed_text = "[Audio not clear or empty]"
                 _logger.warning("Transcription was empty or unclear.")
@@ -73,17 +85,15 @@ class SpeakingTutor(BaseTutor):
         return current_history, current_history
 
     def handle_bot_response(
-        self,
-        history: Optional[List[Dict[str, Any]]],
-        level: Optional[str] = None,
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Gets bot response, plays audio, adds text to history, and returns final state for chatbot and state."""
+        self, history: Optional[List[Dict[str, Any]]], level: Optional[str] = None, bot_audio_path: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]]:
+        """Gets bot response, saves audio, adds text to history, and returns final state and audio path."""
         current_history = history.copy() if history else []
         _logger.info(f"handle_bot_response: Start. History has {len(current_history)} messages.")
 
         if not current_history or current_history[-1].get("role") != "user":
             _logger.warning("handle_bot_response called with invalid history state. Aborting.")
-            return current_history, current_history
+            return current_history, current_history, None
 
         system_prompt = self.tutor_parent.get_system_message(mode="speaking", level=level)
         messages_for_llm = [{"role": "system", "content": system_prompt}] + current_history
@@ -98,22 +108,30 @@ class SpeakingTutor(BaseTutor):
             _logger.error(f"Error calling chat_multimodal: {e}", exc_info=True)
             error_msg = f"Sorry, an error occurred: {e}"
             current_history.append({"role": "assistant", "content": error_msg})
-            return current_history, current_history
+            return current_history, current_history, None
 
         if audio_base64_data:
-            _logger.info("Bot audio found. Playing audio before showing text...")
+            _logger.info("Bot audio data found. Saving to temporary file...")
             try:
                 audio_bytes = base64.b64decode(audio_base64_data)
-                play_audio(audio_bytes)
-                _logger.info("Finished playing bot audio.")
+                bot_audio_path = save_audio_to_temp_file(audio_bytes)
+                _logger.info(f"Bot audio saved to temporary file: {bot_audio_path}")
             except Exception as e:
-                _logger.error(f"Error during blocking audio playback: {e}", exc_info=True)
-                bot_text_response += " (Error playing audio)"
+                _logger.error(f"Error decoding or saving bot audio: {e}", exc_info=True)
+                # Append error to text response if audio processing fails
+                error_suffix = " (Error processing audio data)"
+                if bot_text_response:
+                    bot_text_response += error_suffix
+                else:
+                    # If bot_text_response was empty, create one with the error
+                    bot_text_response = f"[No text response from bot]{error_suffix}"
         else:
-            _logger.warning("No bot audio found in LLM response.")
+            _logger.warning("No bot audio data found in LLM response.")
 
         if bot_text_response:
             current_history.append({"role": "assistant", "content": bot_text_response})
 
-        _logger.info(f"handle_bot_response: Finished. History len: {len(current_history)}")
-        return current_history, current_history
+        _logger.info(
+            f"handle_bot_response: Finished. History len: {len(current_history)}, Audio path: {bot_audio_path}"
+        )
+        return current_history, current_history, bot_audio_path

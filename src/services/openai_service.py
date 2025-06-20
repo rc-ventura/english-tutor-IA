@@ -77,7 +77,25 @@ class OpenAIService:
                 if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
-            logging.error(f"OpenAI API error during streaming: {e}", exc_info=True)
+            logging.error(f"Error during multimodal chat: {e}", exc_info=True)
+            raise
+
+    def text_to_speech(self, text: str, model: str = "tts-1", voice: str = "alloy") -> bytes:
+        """Converts text to speech using OpenAI's TTS model and returns the audio data as bytes."""
+        if not self.client:
+            logging.error("OpenAI client is not initialized. Cannot perform text-to-speech.")
+            raise ConnectionError("OpenAI client not initialized. Please set a valid API key.")
+
+        try:
+            response = self.client.audio.speech.create(
+                model=model,
+                voice=voice,
+                input=text,
+            )
+            # The response contains the audio data directly.
+            return response.content
+        except Exception as e:
+            logging.error(f"Error during text-to-speech generation: {e}", exc_info=True)
             raise
 
     def transcribe_audio(self, audio_file_path: str) -> str:

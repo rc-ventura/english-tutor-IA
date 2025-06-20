@@ -1,31 +1,77 @@
+import base64
 import logging
 import tempfile
+from typing import Any, Dict, List
 
-from gtts import gTTS
-from pydub import AudioSegment
-from pydub.playback import play
+# Configure o logger para este módulo
+_logger = logging.getLogger(__name__)
+if not _logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-logger = logging.getLogger(__name__)
 
-
-def talker(text: str, lang: str = "en"):
-    """Convert text to speech and play it.
-
-    Args:
-        message: Text to convert to speech
-    """
-    if not text or not text.strip():
-        logger.warning("Talker received empty text. Skipping TTS.")
-        return
-
+def save_audio_to_temp_file(audio_bytes: bytes, suffix: str = ".wav") -> str:
+    """Saves audio bytes to a temporary file and returns the file path."""
     try:
-        tts = gTTS(text=text, lang=lang, slow=False)
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as temp_file:
-            tts.save(temp_file.name)
-            sound = AudioSegment.from_mp3(temp_file.name)
-            logger.info(f"Playing TTS for text: '{text[:50]}...'")
-
-            play(sound)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            tmp_file.write(audio_bytes)
+            tmp_path = tmp_file.name
+        _logger.info(f"Audio content saved to temporary file: {tmp_path}")
+        return tmp_path
     except Exception as e:
-        logger.error(f"Error in TTS talker: {e}", exc_info=True)
-        raise  # Or handle more gracefully depending on desired UX
+        _logger.error(f"Failed to save audio to temporary file: {e}", exc_info=True)
+        raise
+
+
+def extract_text_from_response(response: Any) -> str:
+    """Extrai texto da resposta OpenAI, garantindo que sempre retorne uma string."""
+    if not hasattr(response, "choices") or not response.choices:
+        return ""
+
+    message = response.choices[0].message
+    content = message.content
+
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        # Search for the first text block in the content list
+        for item in content:
+            if isinstance(item, Dict) and item.get("type") == "text":
+                return item.get("text", "")
+
+    # Fallback for older or different response structures
+    if content is None and hasattr(message, "audio") and hasattr(message.audio, "transcript"):
+        transcript = getattr(message.audio, "transcript", "")
+        _logger.info(f"Transcript extracted from message.audio.transcript: {transcript!r}")
+        return transcript
+
+    if hasattr(content, "transcript"):
+        transcript = getattr(content, "transcript", "")
+        _logger.info(f"Transcript extracted from message.content.transcript: {transcript!r}")
+        return transcript
+
+    _logger.warning(f"Could not extract text from response. Content type: {type(content)}")
+    return ""
+
+
+def extract_audio_from_response(response: Any) -> str | None:
+    """Extrai o áudio em base64 da resposta da OpenAI."""
+    if not hasattr(response, "choices") or not response.choices:
+        return None
+
+    message = response.choices[0].message
+    if hasattr(message, "audio") and hasattr(message.audio, "data") and message.audio.data:
+        return message.audio.data
+
+    _logger.warning("No audio data found in the response.")
+    return None
+
+
+def encode_file_to_base64(filepath: str) -> str:
+    """Encodes a file to a base64 string."""
+    try:
+        with open(filepath, "rb") as file:
+            return base64.b64encode(file.read()).decode("utf-8")
+    except Exception as e:
+        _logger.error(f"Error encoding file {filepath} to base64: {e}", exc_info=True)
+        raise

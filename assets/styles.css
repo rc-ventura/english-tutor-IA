@@ -80,15 +80,11 @@ body,
   margin-right: auto;
 }
 
-#writing-row {
+/* #writing-row {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
   max-width: 300px;
-}
-
-/* #evaluate-essay-btn {
-  flex: 1 1 calc(50% - 1rem);
 } */
 
 #writing-button-row {
@@ -98,12 +94,12 @@ body,
   justify-content: center;
 }
 
-@media (min-width: 760px) {
+/* @media (min-width: 760px) {
   #writing-row {
     flex-direction: row;
     flex-wrap: wrap;
   }
-}
+} */
 
 #essay-text,
 #chatbot-writing {
@@ -142,6 +138,17 @@ body,
   max-width: 120px;
 }
 
+.svelte-1xp0cw7 {
+  max-width: 1200px;
+}
+
+.svelte-vt1mxs {
+  min-width: min(500px, 100%);
+  max-width: 1200px;
+  display: flex;
+  width: 100%;
+}
+
 @media (max-width: 480px) {
   #writing-buttons .gradio-button {
     flex: 1 1 100%;
@@ -168,6 +175,10 @@ body,
 #component-22,
 #component-8 {
   width: 100%;
+}
+
+#component-15 {
+  align-items: center;
 }
 
 #component-8 {

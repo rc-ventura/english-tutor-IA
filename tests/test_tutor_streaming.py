@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
+import base64
 
-from src.core.speaking_tutor import SpeakingTutor
+from src.core.speaking_tutor import SpeakingTutor, NO_AUDIO_UPDATE
 from src.core.writing_tutor import WritingTutor
 
 
@@ -53,6 +54,12 @@ def test_writing_tutor_generate_random_topic_streams():
 def test_speaking_tutor_process_input_streams():
     service = MagicMock()
     service.stream_chat_completion.return_value = iter(["Hi", " there"])
+    mock_msg = MagicMock()
+    mock_msg.content = "Hi there"
+    mock_msg.audio = MagicMock()
+    mock_msg.audio.data = base64.b64encode(b"audio").decode("utf-8")
+    service.chat_multimodal.return_value = MagicMock(choices=[MagicMock(message=mock_msg)])
+
     with patch("src.core.speaking_tutor.talker"):
         tutor = SpeakingTutor(service, DummyParent())
         history = [{"role": "user", "content": "Hello"}]
@@ -64,6 +71,9 @@ def test_speaking_tutor_process_input_streams():
         last = None
         for item in gen:
             last = copy.deepcopy(item)
+
     assert first[0][-1]["content"] == ""
+    assert isinstance(first[2], str) and first[2].endswith(".wav")
+    assert type(second[2]) is type(NO_AUDIO_UPDATE)
     assert second[0][-1]["content"] == "Hi"
     assert last[0][-1]["content"] == "Hi there"

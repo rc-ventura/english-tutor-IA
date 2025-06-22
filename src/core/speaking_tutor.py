@@ -19,6 +19,16 @@ def talker(*args, **kwargs) -> None:
     """Placeholder talker function for tests."""
     pass
 
+# Gradio's special value to indicate no update. Provide a fallback for tests.
+try:  # pragma: no cover - optional import for runtime only
+    import gradio as gr
+    NO_AUDIO_UPDATE = gr.update()
+except Exception:  # pragma: no cover - tests don't require gradio
+    class _NoUpdate:
+        pass
+
+    NO_AUDIO_UPDATE = _NoUpdate()
+
 _logger = logging.getLogger(__name__)
 if not _logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -214,16 +224,16 @@ class SpeakingTutor(BaseTutor):
             for chunk in self.openai_service.stream_chat_completion(messages=messages_for_llm):
                 reply_buffer += chunk
                 assistant_message["content"] = reply_buffer
-                yield current_history, current_history, None
+                yield current_history, current_history, NO_AUDIO_UPDATE
         except Exception as e:  # pragma: no cover
             _logger.error(f"Error during text streaming: {e}", exc_info=True)
             if not reply_buffer:
                 assistant_message["content"] = f"Sorry, an error occurred: {e}"
-                yield current_history, current_history, None
+                yield current_history, current_history, NO_AUDIO_UPDATE
 
         if not reply_buffer:
             assistant_message["content"] = bot_text_response
-            yield current_history, current_history, None
+            yield current_history, current_history, NO_AUDIO_UPDATE
 
         _logger.info(
             f"handle_bot_response_streaming: Finished. History len: {len(current_history)}, Audio path: {bot_audio_path}"

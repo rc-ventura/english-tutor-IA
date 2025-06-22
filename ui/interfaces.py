@@ -90,12 +90,13 @@ class GradioInterface:
                     inputs=[history_speaking, audio_input_mic, level],
                     outputs=[chatbot_speaking, history_speaking],
                 ).then(
-                    # 2. After transcription -> get bot response (updates history with text) and audio path
+                    # 2. After transcription -> get bot response audio, delay text
                     fn=self.tutor.speaking_tutor.handle_bot_response,
                     inputs=[history_speaking, level],
                     outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
+                    kwargs={"delay_text": True},
                 ).then(
-                    # 3. After bot responds -> clear the audio input component
+                    # 3. Clear the audio input
                     fn=lambda: None,
                     inputs=None,
                     outputs=[audio_input_mic],

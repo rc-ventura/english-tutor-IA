@@ -28,7 +28,9 @@ def extract_text_from_response(response: Any) -> str:
         return ""
 
     message = response.choices[0].message
-    content = message.content
+    content = getattr(message, "content", None)
+    if content is None or not isinstance(content, (str, list)) and hasattr(message, "text"):
+        content = message.text
 
     if isinstance(content, str):
         return content

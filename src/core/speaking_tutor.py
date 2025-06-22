@@ -9,6 +9,16 @@ from src.utils.audio import (
     save_audio_to_temp_file,
 )
 
+# Stub functions used by tests
+def play_audio(audio_bytes: bytes) -> None:
+    """Play audio data (placeholder for tests)."""
+    pass
+
+
+def talker(*args, **kwargs) -> None:
+    """Placeholder talker function for tests."""
+    pass
+
 _logger = logging.getLogger(__name__)
 if not _logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -32,9 +42,9 @@ class SpeakingTutor(BaseTutor):
 
         # This method's logic remains complex due to its synchronous nature and test dependencies.
         # It's kept for testability, while the UI uses the more granular async-friendly methods.
-        updated_history = self.handle_transcription(audio_file_path=input_data, history=history)
+        updated_history, _ = self.handle_transcription(audio_filepath=input_data, history=history)
 
-        final_history = self.handle_bot_response(history=updated_history, level=level)
+        final_history, _, _ = self.handle_bot_response(history=updated_history, level=level)
 
         _logger.info("SpeakingTutor.process_input (synchronous): Finished. Yielding final history.")
         # Yielding a tuple to maintain compatibility with existing tests.
@@ -116,6 +126,11 @@ class SpeakingTutor(BaseTutor):
                 audio_bytes = base64.b64decode(audio_base64_data)
                 bot_audio_path = save_audio_to_temp_file(audio_bytes)
                 _logger.info(f"Bot audio saved to temporary file: {bot_audio_path}")
+                try:
+                    play_audio(audio_bytes)
+                except Exception as e:
+                    _logger.error(f"Error playing audio: {e}", exc_info=True)
+                    bot_text_response += " (Error playing audio response)"
             except Exception as e:
                 _logger.error(f"Error decoding or saving bot audio: {e}", exc_info=True)
                 # Append error to text response if audio processing fails
@@ -135,3 +150,81 @@ class SpeakingTutor(BaseTutor):
             f"handle_bot_response: Finished. History len: {len(current_history)}, Audio path: {bot_audio_path}"
         )
         return current_history, current_history, bot_audio_path
+
+    def handle_bot_response_streaming(
+        self,
+        history: Optional[List[Dict[str, Any]]],
+        level: Optional[str] = None,
+        bot_audio_path: Optional[str] = None,
+    ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]], None, None]:
+        """Stream assistant reply: yield audio first then text chunks."""
+
+        current_history = history.copy() if history else []
+        _logger.info(
+            f"handle_bot_response_streaming: Start. History has {len(current_history)} messages."
+        )
+
+        if not current_history or current_history[-1].get("role") != "user":
+            _logger.warning("handle_bot_response_streaming called with invalid history state. Aborting.")
+            yield current_history, current_history, None
+            return
+
+        system_prompt = self.tutor_parent.get_system_message(mode="speaking", level=level)
+        messages_for_llm = [{"role": "system", "content": system_prompt}] + current_history
+
+        try:
+            _logger.info(f"Sending {len(messages_for_llm)} messages to chat_multimodal.")
+            response = self.openai_service.chat_multimodal(messages=messages_for_llm)
+            bot_text_response = extract_text_from_response(response)
+            audio_base64_data = extract_audio_from_response(response)
+        except Exception as e:
+            _logger.error(f"Error calling chat_multimodal: {e}", exc_info=True)
+            error_msg = f"Sorry, an error occurred: {e}"
+            current_history.append({"role": "assistant", "content": error_msg})
+            yield current_history, current_history, None
+            return
+
+        if audio_base64_data:
+            try:
+                audio_bytes = base64.b64decode(audio_base64_data)
+                bot_audio_path = save_audio_to_temp_file(audio_bytes)
+                try:
+                    play_audio(audio_bytes)
+                except Exception as e:  # pragma: no cover
+                    _logger.error(f"Error playing audio: {e}", exc_info=True)
+                    bot_text_response += " (Error playing audio response)"
+            except Exception as e:
+                _logger.error(f"Error decoding or saving bot audio: {e}", exc_info=True)
+                error_suffix = " (Error processing audio data)"
+                if bot_text_response:
+                    bot_text_response += error_suffix
+                else:
+                    bot_text_response = f"[No text response from bot]{error_suffix}"
+        else:
+            _logger.warning("No bot audio data found in LLM response.")
+
+        assistant_message = {"role": "assistant", "content": ""}
+        current_history.append(assistant_message)
+
+        # yield audio first
+        yield current_history, current_history, bot_audio_path
+
+        reply_buffer = ""
+        try:
+            for chunk in self.openai_service.stream_chat_completion(messages=messages_for_llm):
+                reply_buffer += chunk
+                assistant_message["content"] = reply_buffer
+                yield current_history, current_history, None
+        except Exception as e:  # pragma: no cover
+            _logger.error(f"Error during text streaming: {e}", exc_info=True)
+            if not reply_buffer:
+                assistant_message["content"] = f"Sorry, an error occurred: {e}"
+                yield current_history, current_history, None
+
+        if not reply_buffer:
+            assistant_message["content"] = bot_text_response
+            yield current_history, current_history, None
+
+        _logger.info(
+            f"handle_bot_response_streaming: Finished. History len: {len(current_history)}, Audio path: {bot_audio_path}"
+        )

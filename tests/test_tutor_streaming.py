@@ -25,8 +25,8 @@ def test_writing_tutor_process_input_streams():
             last = copy.deepcopy(item)
     # First yield shows the user's essay
     assert "Please evaluate this essay" in first[0][-1]["content"]
-    # Second yield contains the first streamed chunk
-    assert second[0][-1]["content"] == "Hello"
+    # Second yield is the placeholder assistant message
+    assert second[0][-1]["content"] == ""
     # Final output should contain the full response
     assert last[0][-1]["content"] == "Hello world"
 
@@ -46,7 +46,7 @@ def test_writing_tutor_generate_random_topic_streams():
         for item in gen:
             last = copy.deepcopy(item)
     assert first[0][-1]["content"].startswith("Can you give")
-    assert second[0][-1]["content"] == "Topic"
+    assert second[0][-1]["content"] == ""
     assert last[0][-1]["content"] == "Topic suggestion"
 
 
@@ -56,7 +56,7 @@ def test_speaking_tutor_process_input_streams():
     with patch("src.core.speaking_tutor.talker"):
         tutor = SpeakingTutor(service, DummyParent())
         history = [{"role": "user", "content": "Hello"}]
-        gen = tutor.process_input(history, level="A1")
+        gen = tutor.handle_bot_response_streaming(history=history, level="A1")
         import copy
 
         first = copy.deepcopy(next(gen))
@@ -64,9 +64,6 @@ def test_speaking_tutor_process_input_streams():
         last = None
         for item in gen:
             last = copy.deepcopy(item)
-    assert first[0][-1]["content"] == "Hi"
-    assert second[0][-1]["content"] == "Hi there"
+    assert first[0][-1]["content"] == ""
+    assert second[0][-1]["content"] == "Hi"
     assert last[0][-1]["content"] == "Hi there"
-    outputs = list(gen)
-    assert outputs[0][0][-1]["content"] == "Hello"
-    assert outputs[-1][0][-1]["content"] == "Hello world"

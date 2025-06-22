@@ -71,7 +71,6 @@ class TestSpeakingTutorIntegration(unittest.TestCase):
         ]
         self.speaking_tutor.openai_service.chat_multimodal.assert_called_once_with(
             messages=expected_messages_for_llm,
-            input_audio_path=None,  # SpeakingTutor sends transcribed text, not audio, to chat_multimodal
         )
 
         mock_play_audio.assert_called_once_with(bot_response_audio_bytes)

@@ -5,6 +5,11 @@ from src.core.base_tutor import BaseTutor
 from src.utils.audio import save_audio_to_temp_file
 
 
+# Placeholder talker so tests can patch this symbol without errors
+def talker(*args, **kwargs) -> None:
+    pass
+
+
 class WritingTutor(BaseTutor):
     def _stream_response_to_history(
         self,

@@ -64,7 +64,7 @@ class TestSpeakingTutor(unittest.TestCase):
             {"role": "user", "content": transcribed_text},
         ]
         self.mock_openai_service.chat_multimodal.assert_called_once_with(
-            messages=expected_messages_for_llm, input_audio_path=None
+            messages=expected_messages_for_llm
         )
         mock_play_audio.assert_called_once_with(b"fake_audio_bytes")
 
@@ -77,7 +77,7 @@ class TestSpeakingTutor(unittest.TestCase):
         self.assertEqual(len(results), 1)
         final_history, _ = results[0]
         self.assertEqual(len(final_history), 1)
-        self.assertIn("No audio input received", final_history[0]["content"])
+        self.assertIn("Error: No audio data was recorded or sent", final_history[0]["content"])
         self.mock_openai_service.transcribe_audio.assert_not_called()
 
     @patch("src.core.speaking_tutor.play_audio")
@@ -89,7 +89,7 @@ class TestSpeakingTutor(unittest.TestCase):
         self.assertEqual(len(results), 1)
         final_history, _ = results[0]
         self.assertEqual(len(final_history), 1)
-        self.assertIn("couldn't transcribe your audio", final_history[0]["content"])
+        self.assertIn("Sorry, an error occurred during transcription", final_history[0]["content"])
         self.assertIn("Transcription Error", final_history[0]["content"])
         mock_play_audio.assert_not_called()
 
@@ -100,7 +100,7 @@ class TestSpeakingTutor(unittest.TestCase):
 
         mock_llm_response = MagicMock()
         mock_llm_response.choices = [MagicMock()]
-        mock_llm_response.choices[0].message.text = "Bot response"
+        mock_llm_response.choices[0].message.content = "Bot response"
         mock_llm_response.choices[0].message.audio.data = base64.b64encode(b"audio").decode("utf-8")
         self.mock_openai_service.chat_multimodal.return_value = mock_llm_response
 
@@ -122,7 +122,7 @@ class TestSpeakingTutor(unittest.TestCase):
         final_history, _ = results[0]
         self.assertEqual(len(final_history), 2)  # User message + error message
         self.assertEqual(final_history[0]["content"], transcribed_text)
-        self.assertIn("encountered an error getting a response", final_history[1]["content"])
+        self.assertIn("Sorry, an error occurred", final_history[1]["content"])
         self.assertIn("LLM Error", final_history[1]["content"])
         mock_play_audio.assert_not_called()
 
@@ -161,7 +161,7 @@ class TestSpeakingTutor(unittest.TestCase):
 
         mock_llm_response = MagicMock()
         mock_llm_response.choices = [MagicMock()]
-        mock_llm_response.choices[0].message.text = "Bot text"
+        mock_llm_response.choices[0].message.content = "Bot text"
         mock_llm_response.choices[0].message.audio.data = base64.b64encode(b"audio").decode("utf-8")
         self.mock_openai_service.chat_multimodal.return_value = mock_llm_response
 

@@ -27,9 +27,15 @@ class GradioInterface:
     @staticmethod
     def delay_history(history, seconds: float = 1.0):
         """Return history after a short delay to show audio first."""
+        import logging
         import time
 
+        logger = logging.getLogger(__name__)
+        logger.info("delay_history: start waiting for %.2f seconds", seconds)
+        start = time.monotonic()
         time.sleep(seconds)
+        elapsed = time.monotonic() - start
+        logger.info("delay_history: finished waiting after %.2f seconds", elapsed)
         return history
 
     def create_interface(self):

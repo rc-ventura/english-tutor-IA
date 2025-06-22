@@ -128,9 +128,9 @@ body,
 #writing-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-  align-items: center;
+  gap: 1.5rem;
+  justify-content: space-between;
+  align-items: baseline;
 }
 
 #writing-buttons .gradio-button {

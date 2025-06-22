@@ -151,10 +151,23 @@ class SpeakingTutor(BaseTutor):
             _logger.info(f"Audio-first UX: Waiting for {wait_time:.2f}s for audio to play.")
             time.sleep(wait_time)
 
-            # 3. Now, update the history with the bot's text and yield the final state.
-            current_history.append({"role": "assistant", "content": bot_text_response})
-            _logger.info("Audio-first UX: Yielding updated chat history with bot's text.")
-            yield current_history, current_history, audio_path
+            # 3. Now, simulate the streaming of the bot's text.
+            _logger.info("Audio-first UX: Simulating text stream.")
+            bot_full_text = bot_text_response
+
+            # Add an empty message bubble for the assistant to stream into.
+            current_history.append({"role": "assistant", "content": ""})
+
+            words = bot_full_text.split()
+            for i, word in enumerate(words):
+                # Update the content of the last message
+                current_history[-1]["content"] += word + " "
+
+                # Yield the updated state to the UI
+                yield current_history, current_history, audio_path
+
+                # Control the streaming speed for a natural feel
+                time.sleep(0.05)
 
         except Exception as e:
             _logger.error(f"Error calling chat_multimodal: {e}", exc_info=True)

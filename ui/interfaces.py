@@ -50,15 +50,6 @@ class GradioInterface:
                     set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
                     clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
 
-                # with gr.Row():
-                #     model_dropdown = gr.Dropdown(
-                #         label="model",
-                #         choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                #         value="",
-                #         elem_classes="dropdown-select",
-                #         elem_id="model-select",
-                #     )
-
                 set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
                 clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
 
@@ -70,6 +61,7 @@ class GradioInterface:
                     type="messages",
                     show_copy_button=True,
                     autoscroll=True,
+                    avatar_images=["./assets/user.png", "./assets/sophia-ia.png"],
                     elem_classes="chatbot-container",
                     elem_id="chatbot-speaking",
                 )

@@ -3,6 +3,8 @@ import logging
 import tempfile
 from typing import Any, Dict, List
 
+from pydub import AudioSegment
+
 # Configure o logger para este módulo
 _logger = logging.getLogger(__name__)
 if not _logger.handlers:
@@ -75,3 +77,17 @@ def encode_file_to_base64(filepath: str) -> str:
     except Exception as e:
         _logger.error(f"Error encoding file {filepath} to base64: {e}", exc_info=True)
         raise
+
+
+def get_audio_duration(file_path: str) -> float:
+    """Calculates the duration of an audio file in seconds."""
+    if not file_path:
+        return 0.0
+    try:
+        audio = AudioSegment.from_file(file_path)
+        duration_seconds = len(audio) / 1000.0
+        _logger.info(f"Calculated audio duration for {file_path}: {duration_seconds:.2f}s")
+        return duration_seconds
+    except Exception as e:
+        _logger.error(f"Failed to get duration for audio file {file_path}: {e}", exc_info=True)
+        return 0.0  # Return 0 if duration can't be determined

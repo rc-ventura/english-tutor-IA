@@ -24,6 +24,14 @@ class GradioInterface:
         except ValueError as e:
             return gr.Error(str(e))
 
+    @staticmethod
+    def delay_history(history, seconds: float = 1.0):
+        """Return history after a short delay to show audio first."""
+        import time
+
+        time.sleep(seconds)
+        return history
+
     def create_interface(self):
         """Create and configure the Gradio interface."""
 
@@ -90,12 +98,17 @@ class GradioInterface:
                     inputs=[history_speaking, audio_input_mic, level],
                     outputs=[chatbot_speaking, history_speaking],
                 ).then(
-                    # 2. After transcription -> get bot response (updates history with text) and audio path
-                    fn=self.tutor.speaking_tutor.handle_bot_response,
+                    # 2. After transcription -> get bot response and audio path (history updated only)
+                    fn=self.tutor.speaking_tutor.handle_bot_response_audio_first,
                     inputs=[history_speaking, level],
-                    outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
+                    outputs=[history_speaking, audio_output_speaking],
                 ).then(
-                    # 3. After bot responds -> clear the audio input component
+                    # 3. After audio starts playing -> delay a bit and show text
+                    fn=self.delay_history,
+                    inputs=[history_speaking],
+                    outputs=[chatbot_speaking],
+                ).then(
+                    # 4. Clear the audio input component
                     fn=lambda: None,
                     inputs=None,
                     outputs=[audio_input_mic],

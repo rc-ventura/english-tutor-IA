@@ -135,3 +135,12 @@ class SpeakingTutor(BaseTutor):
             f"handle_bot_response: Finished. History len: {len(current_history)}, Audio path: {bot_audio_path}"
         )
         return current_history, current_history, bot_audio_path
+
+    def handle_bot_response_audio_first(
+        self, history: Optional[List[Dict[str, Any]]], level: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Wrapper to obtain bot response returning history and audio only."""
+        updated_history, _, bot_audio_path = self.handle_bot_response(
+            history=history, level=level
+        )
+        return updated_history, bot_audio_path

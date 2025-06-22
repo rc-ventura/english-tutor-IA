@@ -1,10 +1,8 @@
 import gradio as gr
 from pathlib import Path
-
+from functools import partial
 
 from typing import TYPE_CHECKING
-
-import gradio as gr
 
 if TYPE_CHECKING:
     from src.core.tutor import EnglishTutor
@@ -91,10 +89,12 @@ class GradioInterface:
                     outputs=[chatbot_speaking, history_speaking],
                 ).then(
                     # 2. After transcription -> get bot response audio, delay text
-                    fn=self.tutor.speaking_tutor.handle_bot_response,
+                    fn=partial(
+                        self.tutor.speaking_tutor.handle_bot_response,
+                        delay_text=True,
+                    ),
                     inputs=[history_speaking, level],
                     outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
-                    kwargs={"delay_text": True},
                 ).then(
                     # 3. Clear the audio input
                     fn=lambda: None,

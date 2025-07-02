@@ -1,5 +1,6 @@
 import logging
 from typing import Any, Dict, Generator, List
+from src.models.prompts import TRANSCRIBE_PROMPT
 
 from openai import OpenAI, AuthenticationError
 from openai.types.chat import ChatCompletion
@@ -111,6 +112,7 @@ class OpenAIService:
                     file=audio_file,
                     language="en",
                     response_format="text",
+                    prompt=TRANSCRIBE_PROMPT,
                 )
             logging.info("Audio transcribed successfully.")
             return transcription

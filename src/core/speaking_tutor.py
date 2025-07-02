@@ -32,14 +32,11 @@ class SpeakingTutor(BaseTutor):
             f"SpeakingTutor.process_input (synchronous): Start. audio_file_path='{input_data}', level='{level}'"
         )
 
-        # This method's logic remains complex due to its synchronous nature and test dependencies.
-        # It's kept for testability, while the UI uses the more granular async-friendly methods.
         updated_history = self.handle_transcription(audio_file_path=input_data, history=history)
 
         final_history = self.handle_bot_response(history=updated_history, level=level)
 
         _logger.info("SpeakingTutor.process_input (synchronous): Finished. Yielding final history.")
-        # Yielding a tuple to maintain compatibility with existing tests.
         yield final_history, final_history
 
     def handle_transcription(
@@ -54,31 +51,29 @@ class SpeakingTutor(BaseTutor):
 
         if not audio_filepath:
             _logger.error("No audio filepath provided to handle_transcription.")
-            # Attempt to add an error message to the chat history
-            # This might not be the best place if history is not reliably passed or returned
-            # but let's try for now.
             error_message = {
                 "role": "assistant",
                 "content": "Error: No audio data was recorded or sent. Please try again.",
             }
             if isinstance(current_history, list):
                 current_history.append(error_message)
-            else:  # Should not happen if type hints are followed
+            else:
                 current_history = [error_message]
             return current_history, current_history
 
         try:
             _logger.info(f"Transcribing audio from '{audio_filepath}'...")
             user_transcribed_text = self.openai_service.transcribe_audio(audio_filepath)
+
             if not user_transcribed_text or not user_transcribed_text.strip():
                 user_transcribed_text = "[Audio not clear or empty]"
                 _logger.warning("Transcription was empty or unclear.")
             _logger.info(f"Transcription successful: '{user_transcribed_text}'")
+
         except Exception as e:
             _logger.error(f"Error during audio transcription: {e}", exc_info=True)
             error_msg = f"Sorry, an error occurred during transcription: {e}"
-            # Add user's attempt (empty transcription) and then bot's error message
-            # current_history.append({"role": "user", "content": "[Audio input processed]"}) # Optional: indicate user action
+
             current_history.append({"role": "assistant", "content": error_msg})
             return current_history, current_history
 
@@ -172,5 +167,7 @@ class SpeakingTutor(BaseTutor):
         except Exception as e:
             _logger.error(f"Error calling chat_multimodal: {e}", exc_info=True)
             error_msg = f"Sorry, an error occurred while I was thinking. Please try again."
+
             current_history.append({"role": "assistant", "content": error_msg})
+
             yield current_history, current_history, None

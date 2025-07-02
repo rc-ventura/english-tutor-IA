@@ -32,6 +32,13 @@ DEFAULT_PROMPT = (
     "You are a helpful AI English tutor. My name is Sophia. I'm here to help you improve your English skills."
 )
 
+TRANSCRIBE_PROMPT = (
+    "Transcribe exactly what is spoken, including any errors in grammar, "
+    "pronunciation, or word choice. Preserve all filler words, repetitions, "
+    "and speech disfluencies. Do not correct or improve the text. "
+    "This is for language learning purposes, so we want to see the raw input."
+)
+
 # --- Function ---
 
 

@@ -2,6 +2,7 @@
   --primary-color: #7f5af0;
   --secondary-color: #2cb67d;
   --border-radius: 12px;
+  --button-gradient: linear-gradient(135deg, #7f5af0 0%, #2cb67d 100%);
 }
 
 body,
@@ -30,7 +31,7 @@ body,
 }
 
 .gradio-button {
-  background: var(--primary-color);
+  background: var(--button-gradient);
   color: var(--body-text-color, #ffffff);
   border: none;
   border-radius: var(--border-radius);
@@ -39,10 +40,11 @@ body,
   width: auto;
   max-width: 160px;
   margin: 0.25rem;
+  transition: opacity 0.2s ease-in-out;
 }
 
 .gradio-button:hover {
-  background: #9a7dff;
+  opacity: 0.85;
 }
 
 .input-textbox,
@@ -223,4 +225,16 @@ body,
 #title {
   text-align: center;
   margin-bottom: 1rem;
+}
+
+#word-counter {
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--secondary-color);
+}
+
+#dashboard-placeholder {
+  color: var(--primary-color);
+  text-align: center;
+  padding: 1rem 0;
 }

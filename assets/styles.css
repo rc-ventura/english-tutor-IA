@@ -1,6 +1,6 @@
 :root {
-  --primary-color: #7f5af0;
-  --secondary-color: #2cb67d;
+  --primary-color: #ff6b6b;
+  --secondary-color: #1e90ff;
   --border-radius: 12px;
 }
 
@@ -42,7 +42,7 @@ body,
 }
 
 .gradio-button:hover {
-  background: #9a7dff;
+  background: #ff8c8c;
 }
 
 .input-textbox,
@@ -223,4 +223,14 @@ body,
 #title {
   text-align: center;
   margin-bottom: 1rem;
+}
+
+#dashboard-table {
+  width: 100%;
+  margin-top: 1rem;
+}
+
+#word-count {
+  font-weight: bold;
+  margin-top: 0.5rem;
 }

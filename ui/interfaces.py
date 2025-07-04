@@ -1,10 +1,8 @@
 import gradio as gr
 from pathlib import Path
-
-
-from typing import TYPE_CHECKING
-
-import gradio as gr
+from datetime import datetime
+from typing import TYPE_CHECKING, List, Dict, Tuple
+import pandas as pd
 
 if TYPE_CHECKING:
     from src.core.tutor import EnglishTutor
@@ -15,6 +13,26 @@ class GradioInterface:
 
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
+
+    @staticmethod
+    def _count_words(text: str) -> str:
+        """Return a string representing the word count for display."""
+        if not text:
+            return "Word Count: 0"
+        return f"Word Count: {len(text.split())}"
+
+    @staticmethod
+    def _update_progress(
+        progress: List[Dict[str, str]], essay_type: str, text: str
+    ) -> Tuple[List[Dict[str, str]], pd.DataFrame]:
+        """Append a new entry to the progress dashboard."""
+        entry = {
+            "Timestamp": datetime.now().strftime("%H:%M:%S"),
+            "Essay Type": essay_type,
+            "Word Count": str(len(text.split())),
+        }
+        progress = progress + [entry]
+        return progress, pd.DataFrame(progress)
 
     def set_api_key_ui(self, api_key: str):
         """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
@@ -34,24 +52,38 @@ class GradioInterface:
             # State
             history_speaking = gr.State([])
             history_writing = gr.State([])
+            progress_state = gr.State([])
             level = gr.State("B1")  # default level
+            dashboard_table = gr.DataFrame(
+                headers=["Timestamp", "Essay Type", "Word Count"],
+                interactive=False,
+                elem_id="dashboard-table",
+                visible=False,
+            )
 
             with gr.Sidebar():
-                gr.Image(
-                    "./assets/sophia-ia.png", label="English Tutor AI", elem_classes="avatar-image", container=False
-                )
+                with gr.Accordion("Settings", open=True):
+                    gr.Image(
+                        "./assets/sophia-ia.png",
+                        label="English Tutor AI",
+                        elem_classes="avatar-image",
+                        container=False,
+                    )
 
-                gr.Markdown("## Sophia AI", elem_id="title")
+                    gr.Markdown("## Sophia AI", elem_id="title")
 
-                api_key_box = gr.Textbox(
-                    label="API Key", type="password", elem_classes="input-textbox", elem_id="api-key"
-                )
-                with gr.Row():
-                    set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
-                    clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
+                    api_key_box = gr.Textbox(
+                        label="API Key",
+                        type="password",
+                        elem_classes="input-textbox",
+                        elem_id="api-key",
+                    )
+                    with gr.Row():
+                        set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
+                        clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
 
-                set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
-                clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
+                    set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
+                    clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
 
             with gr.Tab("Speaking Skills"):
                 # ... (chatbot, entry, mic components)
@@ -103,6 +135,18 @@ class GradioInterface:
                         elem_classes="dropdown-select",
                         elem_id="level-select",
                     )
+                    essay_type_dropdown = gr.Dropdown(
+                        label="Essay Type",
+                        choices=[
+                            "Narrative",
+                            "Opinion",
+                            "Descriptive",
+                            "Argumentative",
+                        ],
+                        value="Narrative",
+                        elem_classes="dropdown-select",
+                        elem_id="essay-type",
+                    )
                     # audio_output_writing = gr.Audio(visible=True, autoplay=False, elem_id="audio-output-writing")
 
                 with gr.Row(elem_id="writing-button-row"):
@@ -137,6 +181,8 @@ class GradioInterface:
                             autoscroll=True,
                         )
 
+                    word_count = gr.Markdown("Word Count: 0", elem_id="word-count")
+
                     with gr.Row(elem_id="writing-buttons"):
                         play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
                         clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
@@ -164,6 +210,10 @@ class GradioInterface:
                         chatbot_writing,
                         history_writing,
                     ],  # Feedback in chatbot, history updated
+                ).then(
+                    fn=self._update_progress,
+                    inputs=[progress_state, essay_type_dropdown, essay_input_text],
+                    outputs=[progress_state, dashboard_table],
                 )
                 play_audio_btn.click(
                     fn=self.tutor.writing_tutor.play_audio,
@@ -171,7 +221,17 @@ class GradioInterface:
                     outputs=[audio_output_writing],  # Output to the invisible audio component
                 )
 
+                essay_input_text.change(
+                    fn=self._count_words,
+                    inputs=[essay_input_text],
+                    outputs=[word_count],
+                )
+
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
+
+            with gr.Tab("Progress Dashboard"):
+                dashboard_table.render()
+                dashboard_table.visible = True
 
         return demo
 

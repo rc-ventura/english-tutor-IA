@@ -1,5 +1,6 @@
 import gradio as gr
 from pathlib import Path
+from datetime import datetime
 
 
 from typing import TYPE_CHECKING
@@ -36,22 +37,38 @@ class GradioInterface:
             history_writing = gr.State([])
             level = gr.State("B1")  # default level
 
+            def count_words(text: str) -> str:
+                return f"Words: {len(text.split()) if text else 0}"
+
+            def update_dashboard(history, essay, level_val, type_val, table):
+                words = len(essay.split()) if essay else 0
+                row = [datetime.now().strftime("%Y-%m-%d %H:%M"), level_val, type_val, words]
+                updated = table + [row] if isinstance(table, list) else [row]
+                return updated
+
             with gr.Sidebar():
                 gr.Image(
-                    "./assets/sophia-ia.png", label="English Tutor AI", elem_classes="avatar-image", container=False
+                    "./assets/sophia-ia.png",
+                    label="English Tutor AI",
+                    elem_classes="avatar-image",
+                    container=False,
                 )
 
                 gr.Markdown("## Sophia AI", elem_id="title")
 
-                api_key_box = gr.Textbox(
-                    label="API Key", type="password", elem_classes="input-textbox", elem_id="api-key"
-                )
-                with gr.Row():
-                    set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
-                    clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
+                with gr.Accordion("API Key", open=False):
+                    api_key_box = gr.Textbox(
+                        label="Key",
+                        type="password",
+                        elem_classes="input-textbox",
+                        elem_id="api-key",
+                    )
+                    with gr.Row():
+                        set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
+                        clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
 
-                set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
-                clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
+                    set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
+                    clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
 
             with gr.Tab("Speaking Skills"):
                 # ... (chatbot, entry, mic components)
@@ -103,7 +120,16 @@ class GradioInterface:
                         elem_classes="dropdown-select",
                         elem_id="level-select",
                     )
+                    writing_type_dropdown = gr.Dropdown(
+                        label="Writing Type",
+                        choices=["Essay", "Email", "Story", "Article"],
+                        value="Essay",
+                        elem_classes="dropdown-select",
+                        elem_id="writing-type",
+                    )
                     # audio_output_writing = gr.Audio(visible=True, autoplay=False, elem_id="audio-output-writing")
+
+                dashboard_state = gr.State([])
 
                 with gr.Row(elem_id="writing-button-row"):
                     generate_topic_btn = gr.Button(
@@ -136,6 +162,7 @@ class GradioInterface:
                             show_copy_button=True,
                             autoscroll=True,
                         )
+                    word_count = gr.Markdown("Words: 0", elem_id="word-count")
 
                     with gr.Row(elem_id="writing-buttons"):
                         play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
@@ -157,6 +184,12 @@ class GradioInterface:
                     ],  # Topic appears in chatbot, history updated
                 )
 
+                essay_input_text.change(
+                    fn=count_words,
+                    inputs=essay_input_text,
+                    outputs=word_count,
+                )
+
                 evaluate_essay_btn.click(
                     fn=self.tutor.writing_tutor.process_input,
                     inputs=[essay_input_text, history_writing, level_dropdown_writing],
@@ -164,6 +197,14 @@ class GradioInterface:
                         chatbot_writing,
                         history_writing,
                     ],  # Feedback in chatbot, history updated
+                ).then(
+                    fn=update_dashboard,
+                    inputs=[essay_input_text, level_dropdown_writing, writing_type_dropdown, dashboard_state],
+                    outputs=[dashboard_state],
+                ).then(
+                    fn=lambda d: d,
+                    inputs=dashboard_state,
+                    outputs=feedback_table,
                 )
                 play_audio_btn.click(
                     fn=self.tutor.writing_tutor.play_audio,
@@ -172,6 +213,14 @@ class GradioInterface:
                 )
 
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
+
+            with gr.Tab("Feedback Dashboard"):
+                feedback_table = gr.DataFrame(
+                    headers=["Time", "Level", "Type", "Words"],
+                    datatype=["str", "str", "str", "number"],
+                    interactive=False,
+                    elem_classes="dataframe-container",
+                )
 
         return demo
 

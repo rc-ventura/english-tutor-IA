@@ -1,13 +1,16 @@
+
 :root {
-  --primary-color: #7f5af0;
-  --secondary-color: #2cb67d;
+  --primary-color: #4b86f0;
+  --secondary-color: #e84545;
   --border-radius: 12px;
+  --background-color: #101820;
+  --text-color: #ffffff;
 }
 
 body,
 .gradio-container {
-  background-color: var(--background-fill-primary, #ffffff);
-  color: var(--body-text-color, #000000);
+  background-color: var(--background-color);
+  color: var(--text-color);
   font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -17,21 +20,21 @@ body,
 }
 
 .container {
-  background-color: var(--background-fill-secondary, #f7f7f7);
+  background-color: #1a2530;
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
   padding: 1rem;
-  box-shadow: 0 0 10px rgba(127, 90, 240, 0.2);
+  box-shadow: 0 0 10px rgba(75, 134, 240, 0.2);
   transition: box-shadow 0.3s ease;
 }
 
 .container:hover {
-  box-shadow: 0 0 15px rgba(127, 90, 240, 0.3);
+  box-shadow: 0 0 15px rgba(75, 134, 240, 0.4);
 }
 
 .gradio-button {
   background: var(--primary-color);
-  color: var(--body-text-color, #ffffff);
+  color: var(--text-color);
   border: none;
   border-radius: var(--border-radius);
   padding: 0.3rem 0.6rem;
@@ -42,24 +45,25 @@ body,
 }
 
 .gradio-button:hover {
-  background: #9a7dff;
+  background: #648ef6;
+  transform: scale(1.05);
 }
 
 .input-textbox,
 .dropdown-select {
-  background-color: var(--background-fill-secondary, #ffffff);
-  color: var(--body-text-color, #000000);
+  background-color: #1a2530;
+  color: var(--text-color);
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
   width: 100%;
 }
 
 .chatbot-container {
-  background-color: var(--background-fill-secondary, #ffffff);
+  background-color: #1a2530;
   border: 1px solid var(--primary-color);
   border-radius: var(--border-radius);
   padding: 0.5rem;
-  box-shadow: 0 0 8px rgba(127, 90, 240, 0.2);
+  box-shadow: 0 0 8px rgba(75, 134, 240, 0.2);
 }
 
 /* Avatar image styling */
@@ -78,6 +82,15 @@ body,
   display: block;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* dashboard table */
+.dataframe-container {
+  background-color: #1a2530;
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0 8px rgba(75, 134, 240, 0.2);
+  padding: 0.5rem;
 }
 
 /* #writing-row {
@@ -223,4 +236,11 @@ body,
 #title {
   text-align: center;
   margin-bottom: 1rem;
+}
+
+#word-count {
+  text-align: right;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--secondary-color);
 }

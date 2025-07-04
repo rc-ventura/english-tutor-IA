@@ -16,6 +16,16 @@ class GradioInterface:
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
 
+    @staticmethod
+    def _count_words(text: str) -> str:
+        count = len(text.split()) if text else 0
+        return f"Word count: {count}"
+
+    @staticmethod
+    def _increment_stats(stats: dict) -> tuple[dict, str]:
+        stats["essays"] = stats.get("essays", 0) + 1
+        return stats, f"Essays evaluated: {stats['essays']}"
+
     def set_api_key_ui(self, api_key: str):
         """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
         try:
@@ -35,6 +45,7 @@ class GradioInterface:
             history_speaking = gr.State([])
             history_writing = gr.State([])
             level = gr.State("B1")  # default level
+            stats = gr.State({"essays": 0})
 
             with gr.Sidebar():
                 gr.Image(
@@ -52,6 +63,11 @@ class GradioInterface:
 
                 set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
                 clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
+
+            with gr.Tab("Dashboard"):
+                dashboard_markdown = gr.Markdown(
+                    "No essays evaluated yet.", elem_id="dashboard-text"
+                )
 
             with gr.Tab("Speaking Skills"):
                 # ... (chatbot, entry, mic components)
@@ -103,6 +119,19 @@ class GradioInterface:
                         elem_classes="dropdown-select",
                         elem_id="level-select",
                     )
+                    writing_style_dropdown = gr.Dropdown(
+                        label="Type of Writing",
+                        choices=[
+                            "Narrative",
+                            "Descriptive",
+                            "Persuasive",
+                            "Expository",
+                            "Argumentative",
+                        ],
+                        value="Narrative",
+                        elem_classes="dropdown-select",
+                        elem_id="style-select",
+                    )
                     # audio_output_writing = gr.Audio(visible=True, autoplay=False, elem_id="audio-output-writing")
 
                 with gr.Row(elem_id="writing-button-row"):
@@ -126,7 +155,6 @@ class GradioInterface:
                             elem_classes="input-textbox",
                             elem_id="essay-text",
                         )
-
                         chatbot_writing = gr.Chatbot(
                             label="Writing Feedback",
                             height=600,
@@ -136,6 +164,9 @@ class GradioInterface:
                             show_copy_button=True,
                             autoscroll=True,
                         )
+                    word_count_display = gr.Markdown(
+                        "Word count: 0", elem_classes="word-count"
+                    )
 
                     with gr.Row(elem_id="writing-buttons"):
                         play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
@@ -150,28 +181,48 @@ class GradioInterface:
                     inputs=[
                         level_dropdown_writing,
                         history_writing,
-                    ],  # Pass dropdown value and history
+                        writing_style_dropdown,
+                    ],
                     outputs=[
                         chatbot_writing,
                         history_writing,
-                    ],  # Topic appears in chatbot, history updated
+                    ],
                 )
 
                 evaluate_essay_btn.click(
                     fn=self.tutor.writing_tutor.process_input,
-                    inputs=[essay_input_text, history_writing, level_dropdown_writing],
+                    inputs=[
+                        essay_input_text,
+                        history_writing,
+                        level_dropdown_writing,
+                        writing_style_dropdown,
+                    ],
                     outputs=[
                         chatbot_writing,
                         history_writing,
-                    ],  # Feedback in chatbot, history updated
+                    ],
+                ).then(
+                    fn=self._increment_stats,
+                    inputs=[stats],
+                    outputs=[stats, dashboard_markdown],
                 )
                 play_audio_btn.click(
                     fn=self.tutor.writing_tutor.play_audio,
-                    inputs=[history_writing],  # Pass the history state
-                    outputs=[audio_output_writing],  # Output to the invisible audio component
+                    inputs=[history_writing],
+                    outputs=[audio_output_writing],
                 )
 
-                clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
+                essay_input_text.input(
+                    fn=self._count_words,
+                    inputs=essay_input_text,
+                    outputs=word_count_display,
+                )
+
+                clear_writing_btn.click(
+                    fn=lambda: None,
+                    inputs=None,
+                    outputs=[essay_input_text, word_count_display],
+                )
 
         return demo
 

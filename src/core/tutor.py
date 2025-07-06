@@ -11,6 +11,7 @@ from src.core.speaking_tutor import SpeakingTutor
 from src.core.writing_tutor import WritingTutor
 from src.models.prompts import system_message
 from src.services.openai_service import OpenAIService
+from src.core.progress_tracker import ProgressTracker
 from ui.interfaces import run_gradio_interface  # This implies Gradio is handled in ui.interfaces
 
 
@@ -19,6 +20,8 @@ class EnglishTutor:
 
     def __init__(self, model: str = "gpt-4o-mini"):
         self.model = model
+        # Initialize user progress tracking
+        self.progress_tracker = ProgressTracker()
         self._setup()  # This will load openai_api_key from .env if present
 
         # Initialize openai_service. If key is missing, it might be set later via UI.

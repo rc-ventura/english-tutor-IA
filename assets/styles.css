@@ -80,26 +80,19 @@ body,
   margin-right: auto;
 }
 
-/* #writing-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  max-width: 300px;
-} */
+.svelte-1nguped {
+  background: transparent;
+}
 
 #writing-button-row {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 2rem;
+  width: 50%;
   justify-content: center;
+  align-items: center;
 }
-
-/* @media (min-width: 760px) {
-  #writing-row {
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-} */
 
 #essay-text,
 #chatbot-writing {
@@ -177,6 +170,21 @@ body,
   width: 100%;
 }
 
+#component-21 {
+  width: 50%;
+}
+
+#component-10 {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  width: 40%;
+  justify-content: space-between;
+  align-items: center;
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
 #component-15 {
   align-items: center;
 }
@@ -184,23 +192,22 @@ body,
 #component-8 {
   flex-wrap: nowrap;
   justify-content: center;
+  width: 100%;
+
 }
 
 @media (min-width: 768px) {
   #component-17,
   #component-19,
   #component-20 {
-    width: 50%;
+    width: 100%;
   }
 
   #component-22 {
     width: 20%;
   }
 
-  #component-8 {
-    width: 25%;
-  }
-}
+
 
 /*all-containers*/
 
@@ -214,13 +221,176 @@ body,
 
 @media (min-width: 768px) {
   #component-25 {
-    min-width: 500px;
+    min-width: 20%;
   }
 }
 
 /*title-side-bar-markdown*/
 
+/* Sidebar Title */
 #title {
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 16px;
+  color: var(--primary-color);
+}
+
+/* Sidebar Logo */
+#sidebar-logo {
+  margin: 0 auto;
+  display: block;
+  border-radius: 50%;
+  border: 3px solid var(--primary-color);
+  width: 150px;
+  height: 150px;
+}
+
+/* Input Fields */
+#api-key-box {
+  width: 100%;
+  min-width: 300px;
+}
+
+/* Button Row */
+.settings-accordion .gr-row {
+  gap: 12px;
+}
+
+.settings-accordion button {
+  flex: 1;
+}
+
+#api-key-box {
+  width: 100%;
+  min-width: 240px;
+}
+
+/* Settings Accordion */
+.settings-accordion {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 20px 0;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.settings-accordion .group {
+  padding: 12px 0;
+}
+
+/* Settings Buttons */
+button[type="button"].primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+button[type="button"].secondary {
+  background: var(--secondary-color);
+  color: white;
+}
+
+button[type="button"]:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------------- Progress Dashboard ---------------- */
+.progress-dashboard {
+  padding: 1rem;
+  border: 1px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  background: var(--background-fill-secondary, #ffffff);
+  box-shadow: 0 0 6px rgba(127, 90, 240, 0.15);
+  max-width: 600px;
+  margin: 1rem auto;
+}
+
+.progress-dashboard h2,
+.progress-dashboard h3 {
+  text-align: center;
+  margin: 0.5rem 0;
+  color: var(--primary-color);
+}
+
+.progress-bar-outer {
+  width: 100%;
+  height: 16px;
+  background: #e4e4e7;
+  border-radius: 8px;
+  margin: 0.5rem 0 1rem;
+  overflow: hidden;
+}
+
+.progress-bar-inner {
+  height: 100%;
+  background: var(--secondary-color);
+  width: 0;
+  transition: width 0.5s ease;
+}
+
+.badge-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.badge {
+  background: var(--primary-color);
+  color: #fff;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--border-radius);
+  font-size: 0.8rem;
+}
+
+/* Writing type radio buttons */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.radio-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--secondary-light);
+  cursor: pointer;
+}
+
+.radio-item:hover {
+  background: var(--secondary-color);
+  color: white;
+}
+
+/* Settings sidebar */
+.settings-panel {
+  padding: 20px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+/* Settings Accordion */
+.settings-accordion {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-accordion .group {
+  padding: 8px 0;
+}
+
+.settings-accordion .label {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.settings-accordion .dropdown {
+  margin-top: 12px;
 }

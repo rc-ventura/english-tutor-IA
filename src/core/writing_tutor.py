@@ -43,6 +43,11 @@ class WritingTutor(BaseTutor):
 
         user_message_content = f"Please evaluate this essay for a {level} level student:\n\n{input_data}"
         current_history.append({"role": "user", "content": user_message_content})
+        # --- Progress Tracking ---
+        if self.tutor_parent and hasattr(self.tutor_parent, "progress_tracker"):
+            # Award 20 XP per essay evaluation and count one task
+            self.tutor_parent.progress_tracker.add_xp(20)
+            self.tutor_parent.progress_tracker.increment_tasks()
         yield current_history, current_history
 
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)

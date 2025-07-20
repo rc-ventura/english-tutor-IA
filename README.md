@@ -102,6 +102,18 @@ English-Tutor-AI/
 └── pyproject.toml         # Project dependencies (Poetry)
 ```
 
+## ⚛️ React Integration
+
+This repository also includes a minimal React frontend served via **FastAPI**.
+The `api/server.py` file mounts the Gradio interface and exposes REST endpoints
+used by the React app. To try it out:
+
+1. Install the additional dependencies: `pip install fastapi uvicorn`.
+2. Start the backend with `python api/server.py`.
+3. Inside the `frontend` folder run `npm install` and `npm run dev`.
+4. Open `http://localhost:5173` to use the React interface.
+
+
 ## 🔮 Future Roadmap & Vision
 
 Sophia AI is a strong foundation. Future enhancements could include:

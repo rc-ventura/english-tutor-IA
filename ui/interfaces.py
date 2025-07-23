@@ -1,5 +1,8 @@
 import gradio as gr
 from pathlib import Path
+from fastapi import FastAPI
+from gradio.routes import mount_gradio_app
+from fastapi.middleware.cors import CORSMiddleware
 
 
 from typing import TYPE_CHECKING
@@ -100,11 +103,13 @@ class GradioInterface:
                     fn=self.tutor.speaking_tutor.handle_transcription,
                     inputs=[history_speaking, audio_input_mic, english_level],
                     outputs=[chatbot_speaking, history_speaking],
+                    api_name="speaking_transcribe",
                 ).then(
                     # 2. After transcription -> get bot response (updates history with text) and audio path
                     fn=self.tutor.speaking_tutor.handle_bot_response,
                     inputs=[history_speaking, english_level],
                     outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
+                    api_name="speaking_bot_response",
                 ).then(
                     # 3. After bot responds -> clear the audio input component
                     fn=lambda: None,
@@ -165,7 +170,7 @@ class GradioInterface:
                     clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
 
                 audio_output_writing = gr.Audio(
-                    visible=False, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
+                    visible=True, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
                 )
 
                 generate_topic_btn.click(
@@ -173,26 +178,28 @@ class GradioInterface:
                     inputs=[
                         english_level,
                         history_writing,
-                        writing_type,
-                    ],  # Pass dropdown value and history
+                    ],  # Pass level and history only
                     outputs=[
                         chatbot_writing,
                         history_writing,
                     ],  # Topic appears in chatbot, history updated
+                    api_name="generate_topic",
                 )
 
                 evaluate_essay_btn.click(
                     fn=self.tutor.writing_tutor.process_input,
-                    inputs=[essay_input_text, history_writing, writing_type, english_level],
+                    inputs=[essay_input_text, history_writing, english_level],
                     outputs=[
                         chatbot_writing,
                         history_writing,
                     ],  # Feedback in chatbot, history updated
+                    api_name="evaluate_essay",
                 )
                 play_audio_btn.click(
                     fn=self.tutor.writing_tutor.play_audio,
                     inputs=[history_writing],  # Pass the history state
-                    outputs=[audio_output_writing],  # Output to the invisible audio component
+                    outputs=[audio_output_writing],
+                    api_name="play_audio",
                 )
 
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
@@ -214,10 +221,18 @@ class GradioInterface:
 def run_gradio_interface(tutor: "EnglishTutor"):
     """Create and launch the Gradio interface"""
     interface = GradioInterface(tutor)
-    demo = interface.create_interface()
+    demo = interface.create_interface().queue()
 
-    demo.launch(
-        share=True,
-        show_error=True,
-        max_threads=1,
+    # Mount the Gradio app onto a FastAPI app
+    app = FastAPI()
+    app = mount_gradio_app(app, demo, path="/")
+
+    # Add the CORS middleware to the FastAPI app
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
+    return app

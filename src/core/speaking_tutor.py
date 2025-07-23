@@ -82,7 +82,9 @@ class SpeakingTutor(BaseTutor):
         return current_history, current_history
 
     def handle_bot_response(
-        self, history: Optional[List[Dict[str, Any]]], level: Optional[str] = None
+        self,
+        history: Optional[List[Dict[str, Any]]],
+        level: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]], None, None]:
         """
         Gets bot response, yields audio for immediate playback, waits for it to finish,

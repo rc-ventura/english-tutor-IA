@@ -46,19 +46,23 @@ class SpeakingTutor(BaseTutor):
         level: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Transcribes user audio, adds it to history, and returns the updated history for chatbot and state."""
+
         current_history = history.copy() if history else []
         _logger.info(f"handle_transcription: Start. Received audio: {audio_filepath}, Level: {level}")
 
         if not audio_filepath:
             _logger.error("No audio filepath provided to handle_transcription.")
+
             error_message = {
                 "role": "assistant",
                 "content": "Error: No audio data was recorded or sent. Please try again.",
             }
             if isinstance(current_history, list):
                 current_history.append(error_message)
+
             else:
                 current_history = [error_message]
+
             return current_history, current_history
 
         try:
@@ -67,7 +71,9 @@ class SpeakingTutor(BaseTutor):
 
             if not user_transcribed_text or not user_transcribed_text.strip():
                 user_transcribed_text = "[Audio not clear or empty]"
+
                 _logger.warning("Transcription was empty or unclear.")
+
             _logger.info(f"Transcription successful: '{user_transcribed_text}'")
 
         except Exception as e:
@@ -75,6 +81,7 @@ class SpeakingTutor(BaseTutor):
             error_msg = f"Sorry, an error occurred during transcription: {e}"
 
             current_history.append({"role": "assistant", "content": error_msg})
+
             return current_history, current_history
 
         current_history.append({"role": "user", "content": user_transcribed_text})
@@ -82,18 +89,23 @@ class SpeakingTutor(BaseTutor):
         return current_history, current_history
 
     def handle_bot_response(
-        self, history: Optional[List[Dict[str, Any]]], level: Optional[str] = None
+        self,
+        history: Optional[List[Dict[str, Any]]],
+        level: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]], None, None]:
         """
         Gets bot response, yields audio for immediate playback, waits for it to finish,
         then yields the updated chat history with the bot's text.
         """
+
         current_history = history.copy() if history else []
         _logger.info(f"handle_bot_response: Start. History has {len(current_history)} messages.")
 
         if not current_history or current_history[-1].get("role") != "user":
             _logger.warning("handle_bot_response called with invalid history state. Aborting.")
+
             yield current_history, current_history, None
+
             return
 
         system_prompt = self.tutor_parent.get_system_message(mode="speaking", level=level)
@@ -105,6 +117,7 @@ class SpeakingTutor(BaseTutor):
             if current_history[i].get("role") == "assistant":
                 last_assistant_idx = i
                 break
+
         for i, message in enumerate(current_history):
             if message.get("role") == "user" or i == last_assistant_idx:
                 sanitized_history.append(message)
@@ -120,14 +133,19 @@ class SpeakingTutor(BaseTutor):
 
             if not audio_base64_data:
                 _logger.warning("No audio data in first response. Retrying...")
+
                 response = self.tutor_parent.openai_service.chat_multimodal(messages=messages_for_llm, voice="alloy")
+
                 bot_text_response = extract_text_from_response(response)
                 audio_base64_data = extract_audio_from_response(response)
 
             if not bot_text_response or not audio_base64_data:
                 _logger.error("Failed to get bot response or audio even after retry.")
+
                 error_msg = "I'm sorry, I couldn't generate a response."
+
                 current_history.append({"role": "assistant", "content": error_msg})
+
                 yield current_history, current_history, None
                 return
 

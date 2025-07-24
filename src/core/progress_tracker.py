@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import List
+
 """Module for tracking user progress such as XP, badges, completed tasks, etc.
 
 This module is intentionally lightweight so it can be reused by tutors and the UI
@@ -7,10 +12,6 @@ that are embedded in the Gradio interface.
 Future improvements (e.g., persistent storage) can be implemented in this class
 without touching the rest of the codebase.
 """
-from __future__ import annotations
-
-from dataclasses import dataclass, field
-from typing import List
 
 
 @dataclass(slots=True)

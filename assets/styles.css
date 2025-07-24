@@ -193,7 +193,6 @@ body,
   flex-wrap: nowrap;
   justify-content: center;
   width: 100%;
-
 }
 
 @media (min-width: 768px) {
@@ -207,190 +206,189 @@ body,
     width: 20%;
   }
 
+  /*all-containers*/
 
-
-/*all-containers*/
-
-.svelte-vt1mxs {
-  align-items: center;
-}
-
-#component-25 {
-  width: 100%;
-}
-
-@media (min-width: 768px) {
-  #component-25 {
-    min-width: 20%;
+  .svelte-vt1mxs {
+    align-items: center;
   }
-}
 
-/*title-side-bar-markdown*/
+  #component-25 {
+    width: 100%;
+  }
 
-/* Sidebar Title */
-#title {
-  text-align: center;
-  margin-bottom: 16px;
-  color: var(--primary-color);
-}
+  @media (min-width: 768px) {
+    #component-25 {
+      min-width: 20%;
+    }
+  }
 
-/* Sidebar Logo */
-#sidebar-logo {
-  margin: 0 auto;
-  display: block;
-  border-radius: 50%;
-  border: 3px solid var(--primary-color);
-  width: 150px;
-  height: 150px;
-}
+  /*title-side-bar-markdown*/
 
-/* Input Fields */
-#api-key-box {
-  width: 100%;
-  min-width: 300px;
-}
+  /* Sidebar Title */
+  #title {
+    text-align: center;
+    margin-bottom: 16px;
+    color: var(--primary-color);
+  }
 
-/* Button Row */
-.settings-accordion .gr-row {
-  gap: 12px;
-}
+  /* Sidebar Logo */
+  #sidebar-logo {
+    margin: 0 auto;
+    display: block;
+    border-radius: 50%;
+    border: 3px solid var(--primary-color);
+    width: 150px;
+    height: 150px;
+  }
 
-.settings-accordion button {
-  flex: 1;
-}
+  /* Input Fields */
+  #api-key-box {
+    width: 100%;
+    min-width: 300px;
+  }
 
-#api-key-box {
-  width: 100%;
-  min-width: 240px;
-}
+  /* Button Row */
+  .settings-accordion .gr-row {
+    gap: 12px;
+  }
 
-/* Settings Accordion */
-.settings-accordion {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 12px;
-  margin: 20px 0;
-  background: rgba(255, 255, 255, 0.9);
-}
+  .settings-accordion button {
+    flex: 1;
+  }
 
-.settings-accordion .group {
-  padding: 12px 0;
-}
+  #api-key-box {
+    width: 100%;
+    min-width: 240px;
+  }
 
-/* Settings Buttons */
-button[type="button"].primary {
-  background: var(--primary-color);
-  color: white;
-}
+  /* Settings Accordion */
+  .settings-accordion {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 20px 0;
+    background: rgba(255, 255, 255, 0.9);
+  }
 
-button[type="button"].secondary {
-  background: var(--secondary-color);
-  color: white;
-}
+  .settings-accordion .group {
+    padding: 12px 0;
+  }
 
-button[type="button"]:hover {
-  transform: scale(1.02);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
+  /* Settings Buttons */
+  button[type="button"].primary {
+    background: var(--primary-color);
+    color: white;
+  }
 
-/* ---------------- Progress Dashboard ---------------- */
-.progress-dashboard {
-  padding: 1rem;
-  border: 1px solid var(--primary-color);
-  border-radius: var(--border-radius);
-  background: var(--background-fill-secondary, #ffffff);
-  box-shadow: 0 0 6px rgba(127, 90, 240, 0.15);
-  max-width: 600px;
-  margin: 1rem auto;
-}
+  button[type="button"].secondary {
+    background: var(--secondary-color);
+    color: white;
+  }
 
-.progress-dashboard h2,
-.progress-dashboard h3 {
-  text-align: center;
-  margin: 0.5rem 0;
-  color: var(--primary-color);
-}
+  button[type="button"]:hover {
+    transform: scale(1.02);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  }
 
-.progress-bar-outer {
-  width: 100%;
-  height: 16px;
-  background: #e4e4e7;
-  border-radius: 8px;
-  margin: 0.5rem 0 1rem;
-  overflow: hidden;
-}
+  /* ---------------- Progress Dashboard ---------------- */
+  .progress-dashboard {
+    padding: 1rem;
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    background: var(--background-fill-secondary, #ffffff);
+    box-shadow: 0 0 6px rgba(127, 90, 240, 0.15);
+    max-width: 600px;
+    margin: 1rem auto;
+  }
 
-.progress-bar-inner {
-  height: 100%;
-  background: var(--secondary-color);
-  width: 0;
-  transition: width 0.5s ease;
-}
+  .progress-dashboard h2,
+  .progress-dashboard h3 {
+    text-align: center;
+    margin: 0.5rem 0;
+    color: var(--primary-color);
+  }
 
-.badge-list {
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-  padding: 0;
-  margin: 0;
-}
+  .progress-bar-outer {
+    width: 100%;
+    height: 16px;
+    background: #e4e4e7;
+    border-radius: 8px;
+    margin: 0.5rem 0 1rem;
+    overflow: hidden;
+  }
 
-.badge {
-  background: var(--primary-color);
-  color: #fff;
-  padding: 0.3rem 0.6rem;
-  border-radius: var(--border-radius);
-  font-size: 0.8rem;
-}
+  .progress-bar-inner {
+    height: 100%;
+    background: var(--secondary-color);
+    width: 0;
+    transition: width 0.5s ease;
+  }
 
-/* Writing type radio buttons */
-.radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
+  .badge-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+  }
 
-.radio-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 4px;
-  background: var(--secondary-light);
-  cursor: pointer;
-}
+  .badge {
+    background: var(--primary-color);
+    color: #fff;
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--border-radius);
+    font-size: 0.8rem;
+  }
 
-.radio-item:hover {
-  background: var(--secondary-color);
-  color: white;
-}
+  /* Writing type radio buttons */
+  .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
 
-/* Settings sidebar */
-.settings-panel {
-  padding: 20px;
-  background: #f5f5f5;
-  border-radius: 8px;
-}
+  .radio-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: var(--secondary-light);
+    cursor: pointer;
+  }
 
-/* Settings Accordion */
-.settings-accordion {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px;
-  margin-bottom: 16px;
-}
+  .radio-item:hover {
+    background: var(--secondary-color);
+    color: white;
+  }
 
-.settings-accordion .group {
-  padding: 8px 0;
-}
+  /* Settings sidebar */
+  .settings-panel {
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+  }
 
-.settings-accordion .label {
-  font-weight: bold;
-  margin-bottom: 8px;
-}
+  /* Settings Accordion */
+  .settings-accordion {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 16px;
+  }
 
-.settings-accordion .dropdown {
-  margin-top: 12px;
+  .settings-accordion .group {
+    padding: 8px 0;
+  }
+
+  .settings-accordion .label {
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+
+  .settings-accordion .dropdown {
+    margin-top: 12px;
+  }
 }

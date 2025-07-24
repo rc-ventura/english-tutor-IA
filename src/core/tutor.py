@@ -1,5 +1,6 @@
 import logging
 import os
+import uvicorn
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -97,7 +98,8 @@ class EnglishTutor:
 
     def launch_ui(self):
         """Run the Gradio interface."""
-        run_gradio_interface(self)
+        app = run_gradio_interface(self)
+        uvicorn.run(app, host="127.0.0.1", port=7901)
 
 
 # module-level function

@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Dict, Generator, List, Optional, Tuple
-
+import gradio as gr
 from src.core.base_tutor import BaseTutor
 from src.utils.audio import save_audio_to_temp_file
 
@@ -41,6 +41,10 @@ class WritingTutor(BaseTutor):
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]], None, None]:
         """Evaluates an essay and streams the feedback into the chat history."""
 
+        if not self.tutor_parent.openai_service:
+            yield gr.Error("No valid OpenAI API key set. Please enter your API key in the settings."), []
+            return
+
         current_history = history.copy() if history else []
 
         if not input_data or not input_data.strip():
@@ -56,6 +60,7 @@ class WritingTutor(BaseTutor):
 
         if self.tutor_parent and hasattr(self.tutor_parent, "progress_tracker"):
             # Award 20 XP per essay evaluation and count one task
+
             self.tutor_parent.progress_tracker.add_xp(20)
             self.tutor_parent.progress_tracker.increment_tasks()
 
@@ -76,13 +81,22 @@ class WritingTutor(BaseTutor):
 
         current_history = history.copy() if history else []
 
+        if not self.tutor_parent.openai_service:
+            error_message = {
+                "role": "assistant",
+                "content": "⚠️ No valid OpenAI API key set. Please enter your API key in the settings.",
+            }
+            current_history.append(error_message)
+            yield current_history, current_history
+            return
+
         user_request_message = f"Can you give me an essay topic for level {level} referring to {writing_type}."
         current_history.append({"role": "user", "content": user_request_message})
 
         yield current_history, current_history
 
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)
-        prompt_for_llm = f"Generate a topic for a writing essay for a student with the level of {level}. Anayze also the writing type {writing_type}. Suggest structure and number of lines and number of words expectation."
+        prompt_for_llm = f"Generate a topic for a writing essay for a student with the level of {level}. Analyze also the writing type {writing_type}. Suggest structure and number of lines and number of words expectation."
 
         messages_for_topic = [
             {"role": "system", "content": system_prompt},

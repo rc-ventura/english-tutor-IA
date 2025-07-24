@@ -14,15 +14,25 @@ class OpenAIService:
     @staticmethod
     def is_key_valid(api_key: str) -> bool:
         """Checks if the provided OpenAI API key is valid by attempting a lightweight API call."""
-        if not api_key:
+        if not api_key or not api_key.strip():
+            return False
+        if not api_key.startswith("sk-"):
             return False
         try:
             client = OpenAI(api_key=api_key)
             client.models.list()  # A simple call to check authentication
             return True
         except AuthenticationError:
-            logging.warning("Invalid API key provided.")
+            logging.warning("Invalid API key provided (AuthenticationError)")
             return False
+        except Exception as e:
+            # Catch other errors like rate limits, network issues, etc.
+            if "401" in str(e) or "authentication" in str(e).lower():
+                logging.warning(f"Authentication failed: {e}")
+                return False
+            else:
+                logging.warning(f"API validation error: {e}")
+                return False
 
     def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
         if not api_key:

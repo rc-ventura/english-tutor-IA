@@ -42,26 +42,19 @@ class EnglishTutor:
 
         if not api_key or not api_key.strip():
             self.openai_service = None
-
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = None
-
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = None
-
             raise ValueError("API key cannot be empty or just whitespace.")
 
         if not OpenAIService.is_key_valid(api_key):
             self.openai_api_key = current_api_key_attempt
-
             self.openai_service = None
-
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = None
-
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = None
-
             raise ValueError("Invalid OpenAI API key provided. Please check the key and try again.")
 
         try:
@@ -70,22 +63,18 @@ class EnglishTutor:
 
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = self.openai_service
-
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = self.openai_service
 
         except Exception as e:
             self.openai_api_key = current_api_key_attempt
             self.openai_service = None
-
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = None
-
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = None
-
-            logging.error(f"Failed to initialize OpenAIService with a key that was deemed valid: {e}", exc_info=True)
-            raise ValueError(f"Failed to initialize OpenAI service, though the key appeared valid: {e}")
+            logging.error(f"Failed to initialize OpenAIService: {e}", exc_info=True)
+            raise ValueError(f"Failed to initialize OpenAI service: {e}")
 
     def _setup(self) -> None:
         """Initialize configuration."""

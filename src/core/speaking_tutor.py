@@ -1,6 +1,8 @@
 import base64
 import logging
 import time
+import os
+import gradio as gr
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from src.core.base_tutor import BaseTutor
@@ -45,48 +47,29 @@ class SpeakingTutor(BaseTutor):
         audio_filepath: Optional[str] = None,
         level: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Transcribes user audio, adds it to history, and returns the updated history for chatbot and state."""
-
+        """Transcribes user audio, adds it to history, and returns the updated history."""
         current_history = history.copy() if history else []
-        _logger.info(f"handle_transcription: Start. Received audio: {audio_filepath}, Level: {level}")
 
-        if not audio_filepath:
-            _logger.error("No audio filepath provided to handle_transcription.")
-
+        if not self.tutor_parent.openai_service:
             error_message = {
                 "role": "assistant",
-                "content": "Error: No audio data was recorded or sent. Please try again.",
+                "content": "⚠️ No valid OpenAI API key set. Please enter your API key in the settings.",
             }
-            if isinstance(current_history, list):
-                current_history.append(error_message)
+            current_history.append(error_message)
+            return current_history, current_history
 
-            else:
-                current_history = [error_message]
-
+        if not audio_filepath or not os.path.exists(audio_filepath):
             return current_history, current_history
 
         try:
-            _logger.info(f"Transcribing audio from '{audio_filepath}'...")
-            user_transcribed_text = self.openai_service.transcribe_audio(audio_filepath)
-
-            if not user_transcribed_text or not user_transcribed_text.strip():
-                user_transcribed_text = "[Audio not clear or empty]"
-
-                _logger.warning("Transcription was empty or unclear.")
-
-            _logger.info(f"Transcription successful: '{user_transcribed_text}'")
-
-        except Exception as e:
-            _logger.error(f"Error during audio transcription: {e}", exc_info=True)
-            error_msg = f"Sorry, an error occurred during transcription: {e}"
-
-            current_history.append({"role": "assistant", "content": error_msg})
-
+            transcription = self.tutor_parent.openai_service.transcribe_audio(audio_filepath)
+            user_message = {"role": "user", "content": transcription}
+            current_history.append(user_message)
             return current_history, current_history
-
-        current_history.append({"role": "user", "content": user_transcribed_text})
-        _logger.info("handle_transcription: Finished. Returning updated history.")
-        return current_history, current_history
+        except Exception as e:
+            error_message = {"role": "assistant", "content": f"Error transcribing audio: {str(e)}"}
+            current_history.append(error_message)
+            return current_history, current_history
 
     def handle_bot_response(
         self,
@@ -97,6 +80,9 @@ class SpeakingTutor(BaseTutor):
         Gets bot response, yields audio for immediate playback, waits for it to finish,
         then yields the updated chat history with the bot's text.
         """
+        if not self.tutor_parent.openai_service:
+            yield gr.Error("No valid OpenAI API key set. Please enter your API key in the settings."), [], None
+            return
 
         current_history = history.copy() if history else []
         _logger.info(f"handle_bot_response: Start. History has {len(current_history)} messages.")

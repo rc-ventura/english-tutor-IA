@@ -73,7 +73,6 @@ class GradioInterface:
                 clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
 
             with gr.Tab("Speaking Skills"):
-                # ... (chatbot, entry, mic components)
                 chatbot_speaking = gr.Chatbot(
                     label="Speaking Conversation",
                     height=500,
@@ -94,19 +93,15 @@ class GradioInterface:
                 audio_output_speaking = gr.Audio(
                     visible=False, autoplay=True, label="Bot Speech Output", elem_id="audio-output-speaking"
                 )
-                # Chained event handler for the speaking tutor
-                # 1. User stops recording -> transcribe audio and update history
                 audio_input_mic.stop_recording(
                     fn=self.tutor.speaking_tutor.handle_transcription,
                     inputs=[history_speaking, audio_input_mic, english_level],
                     outputs=[chatbot_speaking, history_speaking],
                 ).then(
-                    # 2. After transcription -> get bot response (updates history with text) and audio path
                     fn=self.tutor.speaking_tutor.handle_bot_response,
                     inputs=[history_speaking, english_level],
                     outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
                 ).then(
-                    # 3. After bot responds -> clear the audio input component
                     fn=lambda: None,
                     inputs=None,
                     outputs=[audio_input_mic],
@@ -174,11 +169,11 @@ class GradioInterface:
                         english_level,
                         history_writing,
                         writing_type,
-                    ],  # Pass dropdown value and history
+                    ],
                     outputs=[
                         chatbot_writing,
                         history_writing,
-                    ],  # Topic appears in chatbot, history updated
+                    ],
                 )
 
                 evaluate_essay_btn.click(
@@ -187,12 +182,12 @@ class GradioInterface:
                     outputs=[
                         chatbot_writing,
                         history_writing,
-                    ],  # Feedback in chatbot, history updated
+                    ],
                 )
                 play_audio_btn.click(
                     fn=self.tutor.writing_tutor.play_audio,
-                    inputs=[history_writing],  # Pass the history state
-                    outputs=[audio_output_writing],  # Output to the invisible audio component
+                    inputs=[history_writing],
+                    outputs=[audio_output_writing],
                 )
 
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])

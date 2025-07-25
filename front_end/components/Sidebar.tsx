@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { EnglishLevel } from '../types';
 import { ActiveTab } from '../App';
@@ -12,7 +13,11 @@ interface SidebarProps {
   englishLevel: EnglishLevel;
   setEnglishLevel: (level: EnglishLevel) => void;
   englishLevels: readonly EnglishLevel[];
+  isClientReady: boolean;
+  setIsClientReady: (isReady: boolean) => void;
 }
+
+type ApiStatus = 'none' | 'valid' | 'invalid';
 
 const NavButton: React.FC<{
   icon: React.ReactNode;
@@ -20,14 +25,16 @@ const NavButton: React.FC<{
   isActive: boolean;
   isCollapsed: boolean;
   onClick: () => void;
-}> = ({ icon, label, isActive, isCollapsed, onClick }) => (
+  disabled?: boolean;
+}> = ({ icon, label, isActive, isCollapsed, onClick, disabled = false }) => (
   <button
     onClick={onClick}
+    disabled={disabled}
     className={`flex items-center w-full px-3 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
       isActive
         ? 'bg-indigo-600 text-white'
         : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-    }`}
+    } disabled:opacity-40 disabled:cursor-not-allowed`}
   >
     {icon}
     {!isCollapsed && <span className="ml-3">{label}</span>}
@@ -35,7 +42,7 @@ const NavButton: React.FC<{
 );
 
 const SettingsAccordion: React.FC<{ title: string; children: React.ReactNode; id: string }> = ({ title, children, id }) => {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(true); // Default to open
     const contentId = `accordion-content-${id}`;
     const headerId = `accordion-header-${id}`;
 
@@ -61,6 +68,26 @@ const SettingsAccordion: React.FC<{ title: string; children: React.ReactNode; id
     );
 };
 
+const ApiStatusIndicator: React.FC<{ status: ApiStatus; message: string; isSaving: boolean }> = ({ status, message, isSaving }) => {
+    const currentStatus = isSaving ? 'saving' : status;
+    const statusConfig = {
+        none: { icon: 'bg-gray-500', text: 'Not Connected', classes: 'bg-gray-700/50 text-gray-300' },
+        saving: { icon: 'bg-yellow-500 animate-pulse', text: 'Validating...', classes: 'bg-yellow-700/50 text-yellow-300' },
+        valid: { icon: 'bg-green-500 shadow-[0_0_5px_theme(colors.green.400)]', text: 'Connected', classes: 'bg-green-700/50 text-green-300' },
+        invalid: { icon: 'bg-red-500', text: 'Connection Failed', classes: 'bg-red-700/50 text-red-300' },
+    };
+
+    const { icon, text, classes } = statusConfig[currentStatus];
+
+    return (
+        <div className={`flex items-center gap-2 p-2 rounded-md text-xs mt-2 transition-colors ${classes}`} title={message}>
+            <div className={`w-2.5 h-2.5 rounded-full ${icon}`}></div>
+            <span className="font-medium">{text}</span>
+            {message && <span className="truncate text-gray-400 flex-1 text-right">{message.replace(/^[✅❌]/, '').trim()}</span>}
+        </div>
+    );
+};
+
 
 const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
@@ -70,24 +97,48 @@ const Sidebar: React.FC<SidebarProps> = ({
   englishLevel,
   setEnglishLevel,
   englishLevels,
+  isClientReady,
+  setIsClientReady,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(apiKey);
+  const [isSaving, setIsSaving] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState<ApiStatus>('none');
+  const [statusMessage, setStatusMessage] = useState('');
 
   const handleSaveKey = async () => {
+    setIsSaving(true);
+    setStatusMessage('');
     try {
-      await api.setApiKey(tempApiKey);
-      setApiKey(tempApiKey);
-      alert('API key saved successfully!'); // Simple feedback
+      const message = await api.setApiKey(tempApiKey);
+      setStatusMessage(message);
+      if (message.startsWith('✅')) {
+        setApiKey(tempApiKey);
+        setIsClientReady(true);
+        setApiKeyStatus('valid');
+      } else {
+        setApiKey('');
+        setIsClientReady(false);
+        setApiKeyStatus('invalid');
+      }
     } catch (error) {
       console.error('Failed to save API key:', error);
-      alert('Failed to save API key.');
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      setStatusMessage(`Connection failed: ${errorMessage}`);
+      setIsClientReady(false);
+      setApiKeyStatus('invalid');
+    } finally {
+        setIsSaving(false);
     }
   };
 
   const handleClearKey = () => {
     setTempApiKey('');
     setApiKey('');
+    setIsClientReady(false);
+    setActiveTab('speaking');
+    setApiKeyStatus('none');
+    setStatusMessage('');
   };
 
   return (
@@ -103,9 +154,9 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
-        <NavButton icon={<MessageSquareIcon className="w-6 h-6" />} label="Speaking" isActive={activeTab === 'speaking'} isCollapsed={isCollapsed} onClick={() => setActiveTab('speaking')} />
-        <NavButton icon={<PencilIcon className="w-6 h-6" />} label="Writing" isActive={activeTab === 'writing'} isCollapsed={isCollapsed} onClick={() => setActiveTab('writing')} />
-        <NavButton icon={<BarChartIcon className="w-6 h-6" />} label="Progress" isActive={activeTab === 'progress'} isCollapsed={isCollapsed} onClick={() => setActiveTab('progress')} />
+        <NavButton icon={<MessageSquareIcon className="w-6 h-6" />} label="Speaking" isActive={activeTab === 'speaking'} isCollapsed={isCollapsed} onClick={() => setActiveTab('speaking')} disabled={!isClientReady}/>
+        <NavButton icon={<PencilIcon className="w-6 h-6" />} label="Writing" isActive={activeTab === 'writing'} isCollapsed={isCollapsed} onClick={() => setActiveTab('writing')} disabled={!isClientReady} />
+        <NavButton icon={<BarChartIcon className="w-6 h-6" />} label="Progress" isActive={activeTab === 'progress'} isCollapsed={isCollapsed} onClick={() => setActiveTab('progress')} disabled={!isClientReady} />
       </nav>
 
       <div className="p-4 border-t border-gray-700">
@@ -126,9 +177,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                             onChange={(e) => setTempApiKey(e.target.value)}
                             className="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded-l-md focus:ring-indigo-500 focus:border-indigo-500"
                         />
-                        <button onClick={handleSaveKey} className="p-2 bg-indigo-600 hover:bg-indigo-700 rounded-r-md" aria-label="Save API Key"><SaveIcon className="w-5 h-5"/></button>
+                        <button onClick={handleSaveKey} disabled={isSaving} className="p-2 bg-indigo-600 hover:bg-indigo-700 rounded-r-md disabled:opacity-50 disabled:cursor-wait" aria-label="Save API Key">
+                            <SaveIcon className="w-5 h-5"/>
+                        </button>
                         <button onClick={handleClearKey} className="p-2 ml-1 bg-gray-600 hover:bg-gray-500 rounded-md" aria-label="Clear API Key"><TrashIcon className="w-5 h-5"/></button>
                     </div>
+                    <ApiStatusIndicator status={apiKeyStatus} message={statusMessage} isSaving={isSaving} />
                 </SettingsAccordion>
                 <SettingsAccordion title="English Level" id="english-level-accordion">
                     <select
@@ -137,6 +191,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         aria-label="English Level Selection"
                         onChange={(e) => setEnglishLevel(e.target.value as EnglishLevel)}
                         className="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        disabled={!isClientReady}
                     >
                         {englishLevels.map(level => (
                             <option key={level} value={level}>{level}</option>

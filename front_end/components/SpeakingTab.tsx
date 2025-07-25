@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage, EnglishLevel } from '../types';
-import Chatbot from './Chatbot';
-import { MicIcon, StopCircleIcon } from './icons/Icons';
-import * as api from '../services/api';
+import React, { useState, useRef, useEffect } from "react";
+import { ChatMessage, EnglishLevel } from "../types";
+import Chatbot from "./Chatbot";
+import { MicIcon, StopCircleIcon } from "./icons/Icons";
+import * as api from "../services/api";
 
 interface SpeakingTabProps {
   englishLevel: EnglishLevel;
@@ -11,8 +11,9 @@ interface SpeakingTabProps {
 const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
-      role: 'assistant',
-      content: "Hello! I'm Sophia, your AI English tutor. Let's practice speaking. Press the microphone button and start talking.",
+      role: "assistant",
+      content:
+        "Hello! I'm Sophia, your AI English tutor. Let's practice speaking. Press the microphone button and start talking.",
     },
   ]);
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -27,13 +28,16 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
     return () => {
       if (audioEl) {
         audioEl.pause();
-        audioEl.src = '';
+        audioEl.src = "";
       }
     };
   }, []);
 
   const handleStopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setIsLoading(true);
@@ -53,31 +57,42 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const userPlaceholder: ChatMessage = { role: 'user', content: '[Your speech is being processed...]' };
-        setMessages(prev => [...prev, userPlaceholder]);
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        const userPlaceholder: ChatMessage = {
+          role: "user",
+          content: "[Your speech is being processed...]",
+        };
+        setMessages((prev) => [...prev, userPlaceholder]);
 
         try {
-          const { messages: newMessages, audioUrl } = await api.handleTranscriptionAndResponse(audioBlob, englishLevel);
+          const { messages: newMessages, audioUrl } =
+            await api.handleTranscriptionAndResponse(audioBlob, englishLevel);
           setMessages(newMessages);
 
           if (audioUrl && audioPlayerRef.current) {
-            audioPlayerRef.current.src = audioUrl;
-            audioPlayerRef.current.play().catch(e => console.error("Audio playback failed", e));
           }
+
+          setMessages(newMessages);
         } catch (error) {
           console.error("Error handling transcription and response:", error);
-          const errorMsg: ChatMessage = { role: 'assistant', content: "Sorry, I couldn't process your audio." };
-          setMessages(prev => [...prev, errorMsg]);
+          const errorMsg: ChatMessage = {
+            role: "assistant",
+            content: "Sorry, I couldn't process your audio.",
+          };
+          setMessages((prev) => [...prev, errorMsg]);
         } finally {
           setIsLoading(false);
-          stream.getTracks().forEach(track => track.stop());
+          stream.getTracks().forEach((track) => track.stop());
         }
       };
       recorder.start();
     } catch (err) {
       console.error("Failed to get microphone:", err);
-      alert("Could not access the microphone. Please check your browser permissions.");
+      alert(
+        "Could not access the microphone. Please check your browser permissions."
+      );
     }
   };
 
@@ -96,17 +111,29 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       </div>
       <div className="mt-6">
         <div className="flex flex-col items-center justify-center">
-            <button
-                onClick={handleToggleRecording}
-                className={`flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-opacity-50
-                    ${isRecording ? 'bg-red-600 hover:bg-red-700 focus:ring-red-400' : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-400'}`}
-                aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-            >
-                {isRecording ? <StopCircleIcon className="w-10 h-10 text-white" /> : <MicIcon className="w-10 h-10 text-white" />}
-            </button>
-            <p className="mt-3 text-sm text-gray-400">
-                {isRecording ? 'Recording... Click to stop.' : (isLoading ? 'Processing...' : 'Press the button to speak')}
-            </p>
+          <button
+            onClick={handleToggleRecording}
+            className={`flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-opacity-50
+                    ${
+                      isRecording
+                        ? "bg-red-600 hover:bg-red-700 focus:ring-red-400"
+                        : "bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-400"
+                    }`}
+            aria-label={isRecording ? "Stop recording" : "Start recording"}
+          >
+            {isRecording ? (
+              <StopCircleIcon className="w-10 h-10 text-white" />
+            ) : (
+              <MicIcon className="w-10 h-10 text-white" />
+            )}
+          </button>
+          <p className="mt-3 text-sm text-gray-400">
+            {isRecording
+              ? "Recording... Click to stop."
+              : isLoading
+              ? "Processing..."
+              : "Press the button to speak"}
+          </p>
         </div>
       </div>
       <audio ref={audioPlayerRef} className="hidden" />

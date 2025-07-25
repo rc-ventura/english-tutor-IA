@@ -19,14 +19,14 @@ class GradioInterface:
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
 
-    def set_api_key_ui(self, api_key: str):
-        """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
-        try:
-            self.tutor.set_api_key(api_key)
-            return gr.Success("✅ API key set successfully!")
-        except ValueError as e:
-            print(f"❌ ValueError: {str(e)}")
-            return gr.Error(f"❌ {str(e)}")
+    # def set_api_key_ui(self, api_key: str):
+    #     """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
+    #     try:
+    #         self.tutor.set_api_key(api_key)
+    #         return gr.Success("✅ API key set successfully!")
+    #     except ValueError as e:
+    #         print(f"❌ ValueError: {str(e)}")
+    #         return gr.Error(f"❌ {str(e)}")
 
     def get_progress_html(self):
         """Return the current user progress dashboard HTML."""
@@ -72,8 +72,13 @@ class GradioInterface:
                         value="B1",
                         elem_id="level-select",
                     )
+
                 status_text = gr.Textbox(label="Status", interactive=False, visible=True, lines=2)
-            set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[status_text])
+
+            set_key_btn.click(
+                fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[status_text], api_name="set_api_key_ui"
+            )
+
             clear_key_btn.click(fn=lambda: (None, None), inputs=None, outputs=[api_key_box, status_text])
 
             with gr.Tab("Speaking Skills"):

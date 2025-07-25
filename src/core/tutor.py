@@ -35,27 +35,33 @@ class EnglishTutor:
         self.speaking_tutor = SpeakingTutor(self.openai_service, self)
         self.writing_tutor = WritingTutor(self.openai_service, self)
 
-    def set_api_key(self, api_key: str) -> None:
-        """Update the API key, validate it, and reinitialize the OpenAI service. Raises ValueError if the key is invalid."""
+    def set_api_key(self, api_key: str) -> str:
+        """Update the API key, validate it, and reinitialize the OpenAI service. Returns a message indicating success or failure."""
 
         current_api_key_attempt = api_key
 
         if not api_key or not api_key.strip():
             self.openai_service = None
+
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = None
+
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = None
-            raise ValueError("API key cannot be empty or just whitespace.")
+
+            return "⚠️  API key cannot be empty or contain only whitespace."
 
         if not OpenAIService.is_key_valid(api_key):
             self.openai_api_key = current_api_key_attempt
             self.openai_service = None
+
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = None
+
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = None
-            raise ValueError("Invalid OpenAI API key provided. Please check the key and try again.")
+
+            return "❌ Invalid OpenAI API key. Please check the key and try again."
 
         try:
             self.openai_api_key = api_key
@@ -63,18 +69,23 @@ class EnglishTutor:
 
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = self.openai_service
+
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = self.openai_service
+
+            return "✅ API key set successfully!"
 
         except Exception as e:
             self.openai_api_key = current_api_key_attempt
             self.openai_service = None
+
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = None
+
             if hasattr(self, "writing_tutor") and self.writing_tutor:
                 self.writing_tutor.openai_service = None
-            logging.error(f"Failed to initialize OpenAIService: {e}", exc_info=True)
-            raise ValueError(f"Failed to initialize OpenAI service: {e}")
+
+            return f"🚫 Falha ao inicializar o serviço OpenAI: {e}"
 
     def _setup(self) -> None:
         """Initialize configuration."""

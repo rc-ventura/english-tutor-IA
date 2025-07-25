@@ -1,109 +1,110 @@
-import { Client } from '@gradio/client';
-import type { EnglishLevel, WritingType, ChatMessage } from '../types';
+import { Client, handle_file } from "@gradio/client";
+import type { EnglishLevel, WritingType, ChatMessage } from "../types";
 import type {
-    GradioBotResponsePayload,
-    GradioFile,
-    GradioProgressPayload,
-    GradioTopicPayload,
-    GradioEvaluationPayload,
-    GradioAudioPlaybackPayload,
-} from './gradio';
+  GradioBotResponsePayload,
+  GradioFile,
+  GradioProgressPayload,
+  GradioTopicPayload,
+  GradioEvaluationPayload,
+  GradioAudioPlaybackPayload,
+} from "./gradio";
 
-const GRADIO_URL = "http://127.0.0.1:7860/";
+const BASE_URL = "http://localhost:7901";
 
-let clientInstance: Promise<Client> | null = null;
-const getClient = (): Promise<Client> => {
-    if (!clientInstance) {
-        clientInstance = Client.connect(GRADIO_URL);
-    }
-    return clientInstance;
+// Conecta ao cliente Gradio usando o endpoint correto
+const clientPromise = Client.connect(BASE_URL, {
+  protocol: "http",
+  host: "localhost:7901",
+}).catch((error) => {
+  console.error("Falha ao conectar ao Gradio API:", error);
+  return Promise.reject(error);
+});
+
+const getClient = () => clientPromise;
+
+const formatMessages = (rawMessages: any[]): ChatMessage[] =>
+  Array.isArray(rawMessages)
+    ? rawMessages.map((m) => ({ role: m.role, content: m.content }))
+    : [];
+
+const getFileUrl = (file: GradioFile): string | null =>
+  file?.url ? file.url : file?.path ? `${BASE_URL}/file=${file.path}` : null;
+
+// SET API KEY
+export const setApiKey = async (apiKey: string): Promise<string> => {
+  const client = await getClient();
+  const result = await client.predict("/set_api_key_ui", { api_key: apiKey });
+  const data = result.data as [string];
+  return data[0] ?? "Error: No status message received.";
 };
 
-const getFileUrl = (file: GradioFile): string | null => {
-    if (file?.url) return file.url;
-    if (file?.path) return `${GRADIO_URL}file=${file.path}`;
-    return null;
-}
-
-const formatMessages = (rawMessages: any[]): ChatMessage[] => {
-    if (!Array.isArray(rawMessages)) return [];
-    return rawMessages.map(m => ({
-        role: m.role,
-        content: m.content
-    }));
-}
-
+// AUDIO FLOW
 export const handleTranscriptionAndResponse = async (
-    audioBlob: Blob,
-    level: EnglishLevel
-): Promise<{ messages: ChatMessage[], audioUrl: string | null }> => {
-    const client = await getClient();
+  audioBlob: Blob,
+  level: EnglishLevel
+): Promise<{ messages: ChatMessage[]; audioUrl: string | null }> => {
+  const client = await getClient();
 
-    // In Gradio, event chains often rely on session state. We replicate this by calling endpoints sequentially.
-    // 1. First, send audio for transcription. The backend updates its internal chat history.
-    await client.predict('/handle_transcription', {
-        audio_filepath: audioBlob,
-        level: level,
-    });
+  // 1. Transcrição usando handle_file
+  await client.predict("/speaking_transcribe", {
+    audio_filepath: await handle_file(audioBlob),
+    level,
+  });
 
-    // 2. Then, ask for the bot's response based on the now-updated history.
-    const response = await client.predict('/handle_bot_response', {
-        level: level,
-    });
+  // 2. Resposta do bot
+  const response = await client.predict("/speaking_bot_response", { level });
+  const [rawMessages, audioFile] = response.data as GradioBotResponsePayload;
 
-    const [rawMessages, audioFile] = (response.data as GradioBotResponsePayload);
-    const messages = formatMessages(rawMessages);
-    const audioUrl = getFileUrl(audioFile);
-
-    return { messages, audioUrl };
+  return {
+    messages: formatMessages(rawMessages),
+    audioUrl: getFileUrl(audioFile),
+  };
 };
 
-
+// GERAR TÓPICO ALEATÓRIO
 export const generateRandomTopic = async (
-    level: EnglishLevel,
-    writingType: WritingType
+  level: EnglishLevel,
+  writingType: WritingType
 ): Promise<ChatMessage[]> => {
-    const client = await getClient();
-    const response = await client.predict('/generate_random_topic', {
-        level: level,
-        writing_type: writingType,
-    });
-    const rawMessages = (response.data as GradioTopicPayload)[0];
-    return formatMessages(rawMessages);
+  const client = await getClient();
+  const response = await client.predict("/generate_topic", {
+    level,
+    writing_type: writingType,
+  });
+  const rawMessages = (response.data as GradioTopicPayload)[0];
+  return formatMessages(rawMessages);
 };
 
+// PROCESSAR REDAÇÃO
 export const processInput = async (
-    essayText: string,
-    writingType: WritingType,
-    level: EnglishLevel
+  essayText: string,
+  writingType: WritingType,
+  level: EnglishLevel
 ): Promise<ChatMessage[]> => {
-    const client = await getClient();
-    // Note the parameter name mapping from our app to the Gradio API's specific names
-    const response = await client.predict('/process_input', {
-        input_data: essayText,
-        level: writingType, // Gradio endpoint expects writing_type here
-        param_3: level,     // Gradio endpoint expects englishLevel here
-    });
-    const rawMessages = (response.data as GradioEvaluationPayload)[0];
-    return formatMessages(rawMessages);
+  const client = await getClient();
+  const response = await client.predict("/evaluate_essay", {
+    input_data: essayText,
+    writing_type: writingType,
+    level,
+  });
+  const rawMessages = (response.data as GradioEvaluationPayload)[0];
+  return formatMessages(rawMessages);
 };
 
+// REPRODUZIR ÁUDIO
 export const playLastAudio = async (): Promise<string | null> => {
-     const client = await getClient();
-     // This endpoint relies on the session state managed by the Gradio backend to identify the correct audio.
-     const response = await client.predict('/play_audio', {});
-     const audioFile = (response.data as GradioAudioPlaybackPayload)[0];
-     if (!audioFile) return null;
-     return getFileUrl(audioFile);
+  const client = await getClient();
+  const response = await client.predict("/play_audio", {});
+  const audioFile = (response.data as GradioAudioPlaybackPayload)[0];
+  return getFileUrl(audioFile);
 };
 
-
+// PROGRESSO
 export const getProgressHtml = async (): Promise<string> => {
-    const client = await getClient();
-    const response = await client.predict('/get_progress_html', {});
-    return (response.data as GradioProgressPayload)[0] ?? '';
+  const client = await getClient();
+  const response = await client.predict("/get_progress_html", {});
+  return (
+    (response.data as GradioProgressPayload)[0] ??
+    '<p class="text-gray-400">No progress data available.</p>'
+  );
 };
-
-export const setApiKey = async(apiKey: string): Promise<void> => {
-    const client = await getClient();
-    await client.predict

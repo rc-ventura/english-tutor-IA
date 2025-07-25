@@ -1,8 +1,11 @@
 import logging
+import os
+import shutil
 from typing import Any, Dict, Generator, List
 from src.models.prompts import TRANSCRIBE_PROMPT
 
 from openai import OpenAI, AuthenticationError
+from pydub import AudioSegment
 from openai.types.chat import ChatCompletion
 
 # --- Constants for Model Names ---
@@ -16,17 +19,20 @@ class OpenAIService:
         """Checks if the provided OpenAI API key is valid by attempting a lightweight API call."""
         if not api_key or not api_key.strip():
             return False
+
         if not api_key.startswith("sk-"):
             return False
         try:
             client = OpenAI(api_key=api_key)
             client.models.list()  # A simple call to check authentication
+
             return True
+
         except AuthenticationError:
             logging.warning("Invalid API key provided (AuthenticationError)")
             return False
+
         except Exception as e:
-            # Catch other errors like rate limits, network issues, etc.
             if "401" in str(e) or "authentication" in str(e).lower():
                 logging.warning(f"Authentication failed: {e}")
                 return False
@@ -112,11 +118,21 @@ class OpenAIService:
     def transcribe_audio(self, audio_file_path: str) -> str:
         """
         Transcribe audio using the specified transcription model.
-        Returns the transcribed text or raises an exception on error.
+        It uses pydub to convert the input audio to a valid WAV format first,
+        ensuring compatibility with OpenAI's API and handling potentially corrupted files.
         """
-        logging.info(f"Transcribing audio file: {audio_file_path}")
+        logging.info(f"Received audio for transcription: {audio_file_path}")
+        converted_wav_path = audio_file_path + ".wav"
+
         try:
-            with open(audio_file_path, "rb") as audio_file:
+            # Convert the input audio file to WAV format using pydub
+            # This handles various input formats and fixes potential corruption.
+            audio = AudioSegment.from_file(audio_file_path)
+            audio.export(converted_wav_path, format="wav")
+            logging.info(f"Successfully converted audio to WAV: {converted_wav_path}")
+
+            # Transcribe the converted WAV file
+            with open(converted_wav_path, "rb") as audio_file:
                 transcription = self.client.audio.transcriptions.create(
                     model=TRANSCRIPTION_MODEL,
                     file=audio_file,
@@ -124,8 +140,17 @@ class OpenAIService:
                     response_format="text",
                     prompt=TRANSCRIBE_PROMPT,
                 )
+
             logging.info("Audio transcribed successfully.")
-            return transcription
+            return transcription if isinstance(transcription, str) else transcription.text
+
         except Exception as e:
-            logging.error(f"OpenAI API error during transcription: {e}", exc_info=True)
+            logging.error(f"Error during audio conversion or transcription: {e}", exc_info=True)
+            # Re-raise the exception to be handled by the calling function
             raise
+
+        finally:
+            # Clean up the converted WAV file
+            if os.path.exists(converted_wav_path):
+                os.remove(converted_wav_path)
+                logging.info(f"Removed temporary WAV file: {converted_wav_path}")

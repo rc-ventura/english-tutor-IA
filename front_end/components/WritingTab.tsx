@@ -28,20 +28,36 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
     };
   }, []);
 
-  const handleGenerateTopic = async () => {
+  // Streaming: mantém referência para cancelar caso o usuário clique várias vezes
+  const topicJobRef = useRef<null | (() => void)>(null);
+
+  const handleGenerateTopic = () => {
     setIsLoading(true);
     setFeedbackMessages([]);
     setHasEvaluated(false);
-    try {
-      const newMessages = await api.generateRandomTopic(englishLevel, writingType);
-      setFeedbackMessages(newMessages);
-    } catch (error) {
-      console.error("Failed to generate topic:", error);
-      setFeedbackMessages([{ role: 'assistant', content: 'Sorry, I could not generate a topic right now.' }]);
-    } finally {
+    // Cancela streaming anterior, se houver
+    if (topicJobRef.current) topicJobRef.current();
+    let lastMessages: ChatMessage[] = [];
+    topicJobRef.current = api.generateRandomTopicStream(
+      englishLevel,
+      writingType,
+      (messages) => {
+        lastMessages = messages;
+        setFeedbackMessages(messages);
+      },
+      (error) => {
+        console.error("Failed to generate topic (stream):", error);
+        setFeedbackMessages([{ role: 'assistant', content: 'Sorry, I could not generate a topic right now.' }]);
+        setIsLoading(false);
+      }
+    );
+    // Finaliza loading quando acabar o stream
+    // Como não temos callback "done" do Gradio, faz um pequeno delay após última mensagem
+    setTimeout(() => {
       setIsLoading(false);
-    }
+    }, 800);
   };
+
 
   const handleEvaluate = async () => {
     if (!essayText.trim()) return;

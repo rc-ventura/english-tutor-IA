@@ -111,7 +111,46 @@ export const handleTranscriptionAndResponse = (
   };
 };
 
-// GERAR TÓPICO ALEATÓRIO
+// GERAR TÓPICO ALEATÓRIO (STREAMING)
+export const generateRandomTopicStream = (
+  level: EnglishLevel,
+  writingType: WritingType,
+  onData: (messages: ChatMessage[]) => void,
+  onError: (error: Error) => void
+) => {
+  let job;
+  const process = async () => {
+    try {
+      const client = await getClient();
+      job = client.submit("/generate_topic", {
+        level,
+        writing_type: writingType,
+      });
+      (async () => {
+        try {
+          for await (const msg of job) {
+            if (msg.type === "data") {
+              const [rawMessages] = msg.data as [any[]];
+              onData(formatMessages(rawMessages));
+            } else if (msg.type === "status" && msg.stage === "error") {
+              onError(new Error(msg.message ?? "Streaming error"));
+            }
+          }
+        } catch (streamErr) {
+          onError(streamErr as Error);
+        }
+      })();
+    } catch (error) {
+      onError(error as Error);
+    }
+  };
+  process();
+  return () => {
+    if (job) job.cancel();
+  };
+};
+
+// GERAR TÓPICO ALEATÓRIO (FALLBACK NÃO-STREAMING)
 export const generateRandomTopic = async (
   level: EnglishLevel,
   writingType: WritingType

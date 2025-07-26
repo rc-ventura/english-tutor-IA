@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { ChatMessage } from "../types";
 import { UserIcon, BrainCircuitIcon, CopyIcon } from "./icons/Icons";
+import ReactMarkdown from "react-markdown";
 
 interface ChatbotProps {
   messages: ChatMessage[];
@@ -33,7 +34,7 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
         }`}
       >
         <div className="prose prose-sm prose-invert max-w-none prose-p:my-2">
-          {message.content}
+          <ReactMarkdown>{message.content}</ReactMarkdown>
         </div>
         {!isUser && typeof message.content === "string" && (
           <button

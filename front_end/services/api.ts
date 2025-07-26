@@ -81,8 +81,8 @@ export const processInput = async (
     // Note the parameter name mapping from our app to the Gradio API's specific names
     const response = await client.predict('/process_input', {
         input_data: essayText,
-        level: writingType, // Gradio endpoint expects writing_type here
-        param_3: level,     // Gradio endpoint expects englishLevel here
+        writing_type: writingType, // correto: writing_type
+        level: level,              // correto: level
     });
     const rawMessages = (response.data as GradioEvaluationPayload)[0];
     return formatMessages(rawMessages);

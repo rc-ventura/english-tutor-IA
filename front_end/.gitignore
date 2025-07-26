@@ -14,10 +14,7 @@ dist/
 
 # Misc
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+
 
 # Typescript cache
 *.tsbuildinfo
@@ -25,6 +22,16 @@ dist/
 # Optional cache
 .cache
 
-#Vite
+
+
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vite
 .vite
 
+# Vite
+.vite

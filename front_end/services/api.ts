@@ -79,7 +79,7 @@ export const handleTranscriptionAndResponse = (
         try {
           for await (const msg of job) {
             if (msg.type === "data") {
-            console.log("🟣 Gradio streaming raw msg.data:", msg.data);
+              console.log("🟣 Gradio streaming raw msg.data:", msg.data);
               const [rawMessages, audioFile] = msg.data as [any[], any];
               onData({
                 messages: formatMessages(rawMessages),
@@ -132,10 +132,10 @@ export const processInput = async (
   level: EnglishLevel
 ): Promise<ChatMessage[]> => {
   const client = await getClient();
-  const response = await client.predict("/evaluate_essay", {
+  const response = await client.predict("/process_input", {
     input_data: essayText,
     writing_type: writingType,
-    level,
+    level: level,
   });
   const rawMessages = (response.data as GradioEvaluationPayload)[0];
   return formatMessages(rawMessages);

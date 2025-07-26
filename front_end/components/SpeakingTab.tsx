@@ -72,6 +72,10 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           setMessages(newMessages);
 
           if (audioUrl && audioPlayerRef.current) {
+            audioPlayerRef.current.src = audioUrl;
+            audioPlayerRef.current.play().catch((error) => {
+              console.error("Error playing audio:", error);
+            });
           }
 
           setMessages(newMessages);

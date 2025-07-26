@@ -24,3 +24,7 @@ dist/
 
 # Optional cache
 .cache
+
+#Vite
+.vite
+

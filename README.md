@@ -117,24 +117,24 @@ Sophia AI is a strong foundation. Future enhancements could include:
 
 Contributions are welcome! Please feel free to open an issue or submit a pull request.
 
-1. Dê Fork no projeto
-2. Crie uma Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a Branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
+1. Fork the project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 📄 Licença
+## 📄 License
 
-Distribuído sob a licença MIT. Veja `LICENSE` para mais informações.
+Distributed under the MIT License. See `LICENSE` for more information.
 
-## 📧 Contato
+## 📧 Contact
 
-Seu Nome - [@seu_twitter](https://twitter.com/seu_twitter) - seu.email@exemplo.com
+Your Name - [@your_twitter](https://twitter.com/your_twitter) - your.email@example.com
 
-Link do Projeto: [https://github.com/seu-usuario/english-tutor-ai](https://github.com/seu-usuario/english-tutor-ai)
+Project Link: [https://github.com/your-username/english-tutor-ai](https://github.com/your-username/english-tutor-ai)
 
-## 🙏 Agradecimentos
+## 🙏 Acknowledgments
 
-- [OpenAI](https://openai.com/) por fornecer a API incrível
-- A todos os contribuidores que ajudaram a melhorar este projeto
-- A comunidade de código aberto por todo o suporte
+- [OpenAI](https://openai.com/) for providing the amazing API
+- All contributors who helped improve this project
+- The open-source community for all the support

@@ -1,5 +1,8 @@
 import gradio as gr
 from pathlib import Path
+from fastapi import FastAPI
+from gradio.routes import mount_gradio_app
+from fastapi.middleware.cors import CORSMiddleware
 
 
 from typing import TYPE_CHECKING
@@ -16,13 +19,18 @@ class GradioInterface:
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
 
-    def set_api_key_ui(self, api_key: str):
-        """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
-        try:
-            self.tutor.set_api_key(api_key)
-            return gr.Success("API key set successfully!")
-        except ValueError as e:
-            return gr.Error(str(e))
+    # def set_api_key_ui(self, api_key: str):
+    #     """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
+    #     try:
+    #         self.tutor.set_api_key(api_key)
+    #         return gr.Success("✅ API key set successfully!")
+    #     except ValueError as e:
+    #         print(f"❌ ValueError: {str(e)}")
+    #         return gr.Error(f"❌ {str(e)}")
+
+    def get_progress_html(self):
+        """Return the current user progress dashboard HTML."""
+        return self.tutor.progress_tracker.html_dashboard()
 
     def create_interface(self):
         """Create and configure the Gradio interface."""
@@ -34,42 +42,53 @@ class GradioInterface:
             # State
             history_speaking = gr.State([])
             history_writing = gr.State([])
-            level = gr.State("B1")  # default level
+            english_level = gr.State("B1")  # default level
 
             with gr.Sidebar():
-                gr.Image(
-                    "./assets/sophia-ia.png", label="English Tutor AI", elem_classes="avatar-image", container=False
-                )
+                gr.Image(value="assets/sophia-ia.png", height=150, width=150, show_label=False, elem_id="sidebar-logo")
 
                 gr.Markdown("## Sophia AI", elem_id="title")
 
-                api_key_box = gr.Textbox(
-                    label="API Key", type="password", elem_classes="input-textbox", elem_id="api-key"
-                )
-                with gr.Row():
-                    set_key_btn = gr.Button("Set", elem_classes="gradio-button", elem_id="set-key")
-                    clear_key_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-key")
+                with gr.Accordion("⚙️ Settings", open=False):
+                    with gr.Group():
+                        api_key_box = gr.Textbox(
+                            label="🔑 OpenAI API Key",
+                            type="password",
+                            placeholder="sk-...",
+                            elem_id="api-key-box",
+                            scale=3,
+                        )
+                        with gr.Row(elem_classes="settings-button-row"):
+                            set_key_btn = gr.Button(
+                                "💾 Save", variant="primary", elem_classes="gradio-button", elem_id="set-key-btn"
+                            )
+                            clear_key_btn = gr.Button(
+                                "🗑️ Clear", variant="secondary", elem_classes="gradio-button", elem_id="clear-key-btn"
+                            )
 
-                # with gr.Row():
-                #     model_dropdown = gr.Dropdown(
-                #         label="model",
-                #         choices=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-3.5-turbo"],
-                #         value="",
-                #         elem_classes="dropdown-select",
-                #         elem_id="model-select",
-                #     )
+                    english_level = gr.Dropdown(
+                        label="🌐 English Level",
+                        choices=["A1", "A2", "B1", "B2", "C1", "C2"],
+                        value="B1",
+                        elem_id="level-select",
+                    )
 
-                set_key_btn.click(fn=self.set_api_key_ui, inputs=[api_key_box], outputs=[api_key_box])
-                clear_key_btn.click(fn=lambda: None, inputs=None, outputs=[api_key_box])
+                status_text = gr.Textbox(label="Status", interactive=False, visible=True, lines=2)
+
+            set_key_btn.click(
+                fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[status_text], api_name="set_api_key_ui"
+            )
+
+            clear_key_btn.click(fn=lambda: (None, None), inputs=None, outputs=[api_key_box, status_text])
 
             with gr.Tab("Speaking Skills"):
-                # ... (chatbot, entry, mic components)
                 chatbot_speaking = gr.Chatbot(
                     label="Speaking Conversation",
                     height=500,
                     type="messages",
                     show_copy_button=True,
                     autoscroll=True,
+                    avatar_images=["./assets/user.png", "./assets/sophia-ia.png"],
                     elem_classes="chatbot-container",
                     elem_id="chatbot-speaking",
                 )
@@ -83,35 +102,37 @@ class GradioInterface:
                 audio_output_speaking = gr.Audio(
                     visible=False, autoplay=True, label="Bot Speech Output", elem_id="audio-output-speaking"
                 )
-                # Chained event handler for the speaking tutor
-                # 1. User stops recording -> transcribe audio and update history
                 audio_input_mic.stop_recording(
                     fn=self.tutor.speaking_tutor.handle_transcription,
-                    inputs=[history_speaking, audio_input_mic, level],
+                    inputs=[history_speaking, audio_input_mic, english_level],
                     outputs=[chatbot_speaking, history_speaking],
+                    api_name="speaking_transcribe",
                 ).then(
-                    # 2. After transcription -> get bot response (updates history with text) and audio path
                     fn=self.tutor.speaking_tutor.handle_bot_response,
-                    inputs=[history_speaking, level],
+                    inputs=[history_speaking, english_level],
                     outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
+                    api_name="speaking_bot_response",
                 ).then(
-                    # 3. After bot responds -> clear the audio input component
                     fn=lambda: None,
                     inputs=None,
                     outputs=[audio_input_mic],
                 )
 
             with gr.Tab("Writing Skills"):
-                # ... (level dropdown, topic generation, essay input, evaluation)
                 with gr.Row():
-                    level_dropdown_writing = gr.Dropdown(
-                        label="Select English Level",
-                        choices=["A1", "A2", "B1", "B2", "C1", "C2"],
-                        value="B1",
-                        elem_classes="dropdown-select",
-                        elem_id="level-select",
+                    writing_type = gr.Radio(
+                        label="Writing Type",
+                        choices=[
+                            "Daily Journal",
+                            "Email",
+                            "Short Story",
+                            "Formal Essay",
+                            "Business Report",
+                            "Creative Writing",
+                        ],
+                        value="Daily Journal",
+                        container=True,
                     )
-                    # audio_output_writing = gr.Audio(visible=True, autoplay=False, elem_id="audio-output-writing")
 
                 with gr.Row(elem_id="writing-button-row"):
                     generate_topic_btn = gr.Button(
@@ -145,41 +166,56 @@ class GradioInterface:
                             autoscroll=True,
                         )
 
-                    with gr.Row(elem_id="writing-buttons"):
-                        play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
-                        clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
+                with gr.Row(elem_id="writing-buttons"):
+                    play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
+                    clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
 
                 audio_output_writing = gr.Audio(
-                    visible=False, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
+                    visible=True, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
                 )
 
                 generate_topic_btn.click(
                     fn=self.tutor.writing_tutor.generate_random_topic,
                     inputs=[
-                        level_dropdown_writing,
+                        english_level,
                         history_writing,
-                    ],  # Pass dropdown value and history
+                        writing_type,
+                    ],
                     outputs=[
                         chatbot_writing,
                         history_writing,
-                    ],  # Topic appears in chatbot, history updated
+                    ],
+                    api_name="generate_topic",
                 )
 
                 evaluate_essay_btn.click(
                     fn=self.tutor.writing_tutor.process_input,
-                    inputs=[essay_input_text, history_writing, level_dropdown_writing],
+                    inputs=[essay_input_text, history_writing, english_level, writing_type],
                     outputs=[
                         chatbot_writing,
                         history_writing,
-                    ],  # Feedback in chatbot, history updated
+                    ],
+                    api_name="evaluate_essay",
                 )
                 play_audio_btn.click(
                     fn=self.tutor.writing_tutor.play_audio,
-                    inputs=[history_writing],  # Pass the history state
-                    outputs=[audio_output_writing],  # Output to the invisible audio component
+                    inputs=[history_writing],
+                    outputs=[audio_output_writing],
+                    api_name="play_audio",
                 )
 
                 clear_writing_btn.click(fn=lambda: None, inputs=None, outputs=[essay_input_text])
+
+            # ------------------- Progress Dashboard Tab -------------------
+            with gr.Tab("Progress"):
+                progress_html = gr.HTML(value=self.get_progress_html(), elem_id="progress-dashboard")
+                refresh_progress_btn = gr.Button("Refresh", elem_classes="gradio-button", elem_id="refresh-progress")
+
+                refresh_progress_btn.click(
+                    fn=self.get_progress_html,
+                    inputs=None,
+                    outputs=[progress_html],
+                )
 
         return demo
 
@@ -187,10 +223,18 @@ class GradioInterface:
 def run_gradio_interface(tutor: "EnglishTutor"):
     """Create and launch the Gradio interface"""
     interface = GradioInterface(tutor)
-    demo = interface.create_interface()
+    demo = interface.create_interface().queue()
 
-    demo.launch(
-        share=True,
-        show_error=True,
-        max_threads=1,
+    # Mount the Gradio app onto a FastAPI app
+    app = FastAPI()
+    app = mount_gradio_app(app, demo, path="/")
+
+    # Add the CORS middleware to the FastAPI app
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
+    return app

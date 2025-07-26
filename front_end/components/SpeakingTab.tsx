@@ -1,0 +1,220 @@
+import React, { useState, useRef, useEffect } from "react";
+import { ChatMessage, EnglishLevel } from "../types";
+import Chatbot from "./Chatbot";
+import { MicIcon, StopCircleIcon } from "./icons/Icons";
+import * as api from "../services/api";
+
+interface SpeakingTabProps {
+  englishLevel: EnglishLevel;
+}
+
+const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content:
+        "Hello! I'm Sophia, your AI English tutor. Let's practice speaking. Press the microphone button and start talking.",
+    },
+  ]);
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioPlayedRef = useRef<boolean>(false);
+  const streamingJobRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    // Initialize the AudioContext for audio playback
+    audioContextRef.current = new (window.AudioContext ||
+      window.webkitAudioContext)();
+
+    return () => {
+      // Clean up resources when the component unmounts
+      audioContextRef.current?.close();
+      if (streamingJobRef.current) {
+        streamingJobRef.current(); // Cancel any ongoing streaming job
+      }
+    };
+  }, []);
+
+  // Unlocks the audio context on the first user interaction
+  const unlockAudioContext = () => {
+    if (
+      audioContextRef.current &&
+      audioContextRef.current.state === "suspended"
+    ) {
+      audioContextRef.current.resume();
+    }
+  };
+
+  // Plays audio from a URL using the Web Audio API
+  const playAudio = async (url: string) => {
+    if (!audioContextRef.current) return;
+    console.log("🔊 Attempting to play audio from URL:", url);
+    try {
+      console.log("🔊 Fetching audio from URL...");
+      const response = await fetch(url);
+      console.log(
+        "🔊 Fetch response status:",
+        response.status,
+        response.statusText
+      );
+
+      if (!response.ok) {
+        console.error(
+          "🔊 Failed to fetch audio:",
+          response.status,
+          response.statusText
+        );
+        return;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      console.log(
+        "🔊 Audio data received, size:",
+        arrayBuffer.byteLength,
+        "bytes"
+      );
+      const audioBuffer = await audioContextRef.current.decodeAudioData(
+        arrayBuffer
+      );
+      console.log(
+        "🔊 Audio decoded successfully. Duration:",
+        audioBuffer.duration.toFixed(2),
+        "s"
+      );
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      console.log("🔊 Starting audio playback...");
+      source.start(0);
+      source.onended = () => {
+        console.log("🔊 Audio playback finished");
+      };
+    } catch (error) {
+      console.error("Error playing audio with Web Audio API:", error);
+    }
+  };
+
+  const handleStopRecording = () => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      setIsLoading(true);
+    }
+  };
+
+  const handleStartRecording = async () => {
+    unlockAudioContext(); // Unlock audio on user gesture
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setIsRecording(true);
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        const userPlaceholder: ChatMessage = {
+          role: "user",
+          content: "[Your speech is being processed...]",
+        };
+        setMessages((prev) => [...prev, userPlaceholder]);
+
+        audioPlayedRef.current = false; // Reset for the new response
+
+        const handleError = (error: Error) => {
+          console.error("Streaming Error:", error);
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "Sorry, an error occurred." },
+          ]);
+          setIsLoading(false);
+        };
+
+        // Start the streaming job
+        streamingJobRef.current = api.handleTranscriptionAndResponse(
+          audioBlob,
+          englishLevel,
+          (data) => {
+            // onData callback
+            const { messages, audioUrl } = data;
+            console.log("🟢 onData callback: audioUrl=", audioUrl);
+            if (audioUrl && !audioPlayedRef.current) {
+              playAudio(audioUrl);
+              audioPlayedRef.current = true;
+            }
+            setMessages(messages);
+            setIsLoading(false);
+          },
+          handleError // onError callback
+        );
+      };
+      recorder.start();
+    } catch (err) {
+      console.error("Failed to get microphone:", err);
+      alert(
+        "Could not access the microphone. Please check your browser permissions."
+      );
+    }
+  };
+
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      handleStopRecording();
+    } else {
+      handleStartRecording();
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full max-w-4xl mx-auto">
+      <div className="flex-1 overflow-y-auto pr-4">
+        <Chatbot messages={messages} isLoading={isLoading} />
+      </div>
+      <div className="mt-6">
+        <div className="flex flex-col items-center justify-center">
+          <button
+            onClick={handleToggleRecording}
+            className={`flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-opacity-50
+                    ${
+                      isRecording
+                        ? "bg-red-600 hover:bg-red-700 focus:ring-red-400"
+                        : "bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-400"
+                    }`}
+            aria-label={isRecording ? "Stop recording" : "Start recording"}
+          >
+            {isRecording ? (
+              <StopCircleIcon className="w-10 h-10 text-white" />
+            ) : (
+              <MicIcon className="w-10 h-10 text-white" />
+            )}
+          </button>
+          <p className="mt-3 text-sm text-gray-400">
+            {isRecording
+              ? "Recording... Click to stop."
+              : isLoading
+              ? "Processing..."
+              : "Press the button to speak"}
+          </p>
+        </div>
+      </div>
+      <audio ref={audioPlayerRef} className="hidden" />
+    </div>
+  );
+};
+
+export default SpeakingTab;

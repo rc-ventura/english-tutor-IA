@@ -22,16 +22,82 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioPlayedRef = useRef<boolean>(false);
+  const streamingJobRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const audioEl = audioPlayerRef.current;
+    // Initialize the AudioContext for audio playback
+    audioContextRef.current = new (window.AudioContext ||
+      window.webkitAudioContext)();
+
     return () => {
-      if (audioEl) {
-        audioEl.pause();
-        audioEl.src = "";
+      // Clean up resources when the component unmounts
+      audioContextRef.current?.close();
+      if (streamingJobRef.current) {
+        streamingJobRef.current(); // Cancel any ongoing streaming job
       }
     };
   }, []);
+
+  // Unlocks the audio context on the first user interaction
+  const unlockAudioContext = () => {
+    if (
+      audioContextRef.current &&
+      audioContextRef.current.state === "suspended"
+    ) {
+      audioContextRef.current.resume();
+    }
+  };
+
+  // Plays audio from a URL using the Web Audio API
+  const playAudio = async (url: string) => {
+    if (!audioContextRef.current) return;
+    console.log("🔊 Attempting to play audio from URL:", url);
+    try {
+      console.log("🔊 Fetching audio from URL...");
+      const response = await fetch(url);
+      console.log(
+        "🔊 Fetch response status:",
+        response.status,
+        response.statusText
+      );
+
+      if (!response.ok) {
+        console.error(
+          "🔊 Failed to fetch audio:",
+          response.status,
+          response.statusText
+        );
+        return;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      console.log(
+        "🔊 Audio data received, size:",
+        arrayBuffer.byteLength,
+        "bytes"
+      );
+      const audioBuffer = await audioContextRef.current.decodeAudioData(
+        arrayBuffer
+      );
+      console.log(
+        "🔊 Audio decoded successfully. Duration:",
+        audioBuffer.duration.toFixed(2),
+        "s"
+      );
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      console.log("🔊 Starting audio playback...");
+      source.start(0);
+      source.onended = () => {
+        console.log("🔊 Audio playback finished");
+      };
+    } catch (error) {
+      console.error("Error playing audio with Web Audio API:", error);
+    }
+  };
 
   const handleStopRecording = () => {
     if (
@@ -45,6 +111,8 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   };
 
   const handleStartRecording = async () => {
+    unlockAudioContext(); // Unlock audio on user gesture
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setIsRecording(true);
@@ -66,30 +134,34 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         };
         setMessages((prev) => [...prev, userPlaceholder]);
 
-        try {
-          const { messages: newMessages, audioUrl } =
-            await api.handleTranscriptionAndResponse(audioBlob, englishLevel);
-          setMessages(newMessages);
+        audioPlayedRef.current = false; // Reset for the new response
 
-          if (audioUrl && audioPlayerRef.current) {
-            audioPlayerRef.current.src = audioUrl;
-            audioPlayerRef.current.play().catch((error) => {
-              console.error("Error playing audio:", error);
-            });
-          }
-
-          setMessages(newMessages);
-        } catch (error) {
-          console.error("Error handling transcription and response:", error);
-          const errorMsg: ChatMessage = {
-            role: "assistant",
-            content: "Sorry, I couldn't process your audio.",
-          };
-          setMessages((prev) => [...prev, errorMsg]);
-        } finally {
+        const handleError = (error: Error) => {
+          console.error("Streaming Error:", error);
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "Sorry, an error occurred." },
+          ]);
           setIsLoading(false);
-          stream.getTracks().forEach((track) => track.stop());
-        }
+        };
+
+        // Start the streaming job
+        streamingJobRef.current = api.handleTranscriptionAndResponse(
+          audioBlob,
+          englishLevel,
+          (data) => {
+            // onData callback
+            const { messages, audioUrl } = data;
+            console.log("🟢 onData callback: audioUrl=", audioUrl);
+            if (audioUrl && !audioPlayedRef.current) {
+              playAudio(audioUrl);
+              audioPlayedRef.current = true;
+            }
+            setMessages(messages);
+            setIsLoading(false);
+          },
+          handleError // onError callback
+        );
       };
       recorder.start();
     } catch (err) {

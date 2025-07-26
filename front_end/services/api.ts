@@ -27,8 +27,23 @@ const formatMessages = (rawMessages: any[]): ChatMessage[] =>
     ? rawMessages.map((m) => ({ role: m.role, content: m.content }))
     : [];
 
-const getFileUrl = (file: GradioFile): string | null =>
-  file?.url ? file.url : file?.path ? `${BASE_URL}/file=${file.path}` : null;
+type FileLike = GradioFile | string | null | undefined;
+
+const getFileUrl = (file: FileLike): string | null => {
+  if (!file) return null;
+
+  // If backend sends plain string path
+  if (typeof file === "string") {
+    // Already absolute URL?
+    if (file.startsWith("http://") || file.startsWith("https://")) {
+      return file;
+    }
+    return `${BASE_URL}/file=${file}`;
+  }
+
+  // If backend sends structured object
+  return file.url ?? (file.path ? `${BASE_URL}/file=${file.path}` : null);
+};
 
 // SET API KEY
 export const setApiKey = async (apiKey: string): Promise<string> => {
@@ -39,25 +54,60 @@ export const setApiKey = async (apiKey: string): Promise<string> => {
 };
 
 // AUDIO FLOW
-export const handleTranscriptionAndResponse = async (
+export const handleTranscriptionAndResponse = (
   audioBlob: Blob,
-  level: EnglishLevel
-): Promise<{ messages: ChatMessage[]; audioUrl: string | null }> => {
-  const client = await getClient();
+  level: EnglishLevel,
+  onData: (data: { messages: ChatMessage[]; audioUrl: string | null }) => void,
+  onError: (error: Error) => void
+) => {
+  let job;
 
-  // 1. Transcrição usando handle_file
-  await client.predict("/speaking_transcribe", {
-    audio_filepath: await handle_file(audioBlob),
-    level,
-  });
+  const process = async () => {
+    try {
+      const client = await getClient();
 
-  // 2. Resposta do bot
-  const response = await client.predict("/speaking_bot_response", { level });
-  const [rawMessages, audioFile] = response.data as GradioBotResponsePayload;
+      // Step 1: Await the transcription using predict(), as it's a single event.
+      await client.predict("/speaking_transcribe", {
+        audio_filepath: await handle_file(audioBlob),
+        level,
+      });
 
-  return {
-    messages: formatMessages(rawMessages),
-    audioUrl: getFileUrl(audioFile),
+      // Step 2: Once transcription is done, submit the job to stream the bot's response.
+      job = client.submit("/speaking_bot_response", { level });
+
+      (async () => {
+        try {
+          for await (const msg of job) {
+            if (msg.type === "data") {
+            console.log("🟣 Gradio streaming raw msg.data:", msg.data);
+              const [rawMessages, audioFile] = msg.data as [any[], any];
+              onData({
+                messages: formatMessages(rawMessages),
+                audioUrl: getFileUrl(audioFile),
+              });
+            } else if (msg.type === "status" && msg.stage === "error") {
+              console.error("Streaming job failed:", msg);
+              onError(new Error(msg.message ?? "Streaming error"));
+            }
+          }
+        } catch (streamErr) {
+          console.error("Streaming iterator error:", streamErr);
+          onError(streamErr as Error);
+        }
+      })();
+    } catch (error) {
+      console.error("Error in transcription/response process:", error);
+      onError(error as Error);
+    }
+  };
+
+  process();
+
+  // Return a function to allow the component to cancel the job
+  return () => {
+    if (job) {
+      job.cancel();
+    }
   };
 };
 

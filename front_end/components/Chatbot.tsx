@@ -1,12 +1,30 @@
 import React, { useRef, useEffect } from "react";
 import { ChatMessage } from "../types";
 import { UserIcon, BrainCircuitIcon, CopyIcon } from "./icons/Icons";
+import ReactMarkdown from "react-markdown";
 
 interface ChatbotProps {
   messages: ChatMessage[];
   isLoading: boolean;
 }
 
+/**
+ * Renders a single chat message bubble.
+ *
+ * The message bubble is a container component that renders a single chat message.
+ * It takes a `message` prop which is an object with a `role` property (either
+ * "user" or "assistant") and a `content` property which can be either a string
+ * or a JSX node.
+ *
+ * If `message.role` is "assistant", it renders a bot icon on the left side
+ * and a copy button on the right side of the message bubble.
+ *
+ * If `message.role` is "user", it renders a user icon on the right side of
+ * the message bubble.
+ *
+ * The message bubble is styled with Tailwind CSS classes and uses the
+ * `prose` plugin to add some basic styling to the message content.
+ */
 const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   const isUser = message.role === "user";
   const handleCopy = () => {
@@ -26,14 +44,20 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
         </div>
       )}
       <div
-        className={`relative max-w-lg px-4 py-3 rounded-xl shadow ${
+        className={`relative max-w-3xl px-4 py-3 rounded-xl shadow ${
           isUser
             ? "bg-indigo-600 text-white rounded-br-none"
             : "bg-gray-700 text-gray-200 rounded-bl-none"
         }`}
       >
-        <div className="prose prose-sm prose-invert max-w-none prose-p:my-2">
-          {message.content}
+        <div
+          className="
+            prose prose-invert max-w-3xl
+            prose-p:my-1 prose-li:my-0.5 prose-ul:my-0.5 prose-ol:my-0.5
+            prose-h1:my-2 prose-h2:my-1 prose-h3:my-1 prose-h4:my-1 prose-h5:my-1 prose-h6:my-1
+            whitespace-pre-line break-words"
+        >
+          <ReactMarkdown skipHtml>{message.content}</ReactMarkdown>
         </div>
         {!isUser && typeof message.content === "string" && (
           <button

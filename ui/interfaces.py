@@ -19,15 +19,6 @@ class GradioInterface:
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
 
-    # def set_api_key_ui(self, api_key: str):
-    #     """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
-    #     try:
-    #         self.tutor.set_api_key(api_key)
-    #         return gr.Success("✅ API key set successfully!")
-    #     except ValueError as e:
-    #         print(f"❌ ValueError: {str(e)}")
-    #         return gr.Error(f"❌ {str(e)}")
-
     def get_progress_html(self):
         """Return the current user progress dashboard HTML."""
         return self.tutor.progress_tracker.html_dashboard()
@@ -132,19 +123,10 @@ class GradioInterface:
                         ],
                         value="Daily Journal",
                         container=True,
+                        elem_id="writing-type",
                     )
 
-                with gr.Row(elem_id="writing-button-row"):
-                    generate_topic_btn = gr.Button(
-                        "Start",
-                        elem_classes="gradio-button",
-                    )
-                    evaluate_essay_btn = gr.Button(
-                        "Evaluate",
-                        variant="primary",
-                        elem_classes="gradio-button",
-                        elem_id="evaluate-essay-btn",
-                    )
+                # with gr.Row(elem_id="writing-button-row"):
 
                 with gr.Column():
                     with gr.Row(elem_id="writing-row"):
@@ -167,11 +149,22 @@ class GradioInterface:
                         )
 
                 with gr.Row(elem_id="writing-buttons"):
-                    play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
+                    generate_topic_btn = gr.Button(
+                        "Start",
+                        elem_classes="gradio-button",
+                    )
+                    evaluate_essay_btn = gr.Button(
+                        "Evaluate",
+                        variant="primary",
+                        elem_classes="gradio-button",
+                        elem_id="evaluate-essay-btn",
+                    )
+
+                    play_audio_btn = gr.Button("playback", elem_classes="gradio-button", elem_id="play-audio-btn")
                     clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
 
                 audio_output_writing = gr.Audio(
-                    visible=True, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
+                    visible=False, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
                 )
 
                 generate_topic_btn.click(

@@ -96,7 +96,39 @@ class WritingTutor(BaseTutor):
         yield current_history, current_history
 
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)
-        prompt_for_llm = f"Generate a topic for a writing essay for a student with the level of {level}. Analyze also the writing type {writing_type}. Suggest structure and number of lines and number of words expectation."
+        prompt_for_llm = f"""Generate a topic for a writing essay for a student with the level of {level}. Analyze also the writing type {writing_type}.
+
+        Format your response as visually appealing Markdown:
+        - Use clear section titles (e.g., **Essay Topic**, **Writing Type**, **Suggested Structure**, **Word Count Expectation**, **Additional Notes**).
+        - Use numbered and bulleted lists for structure.
+        - Add extra line breaks between sections for readability.
+        - Add at least one relevant emoji per section (e.g., 🐶 for animals, ✍️ for writing, 📋 for structure, 📏 for word count, 💡 for notes).
+        - Make it easy to read for beginner students: use short sentences and simple words.
+        - Add visual spacing (blank lines) between sections and after lists.
+        - Example:
+
+        **Essay Topic:** 🐶 "My Favorite Animal"
+
+        **Writing Type:** ✍️ Formal Essay
+
+        **Suggested Structure:** 📋
+        1. **Introduction**
+            - Introduce the topic and mention your favorite animal.
+        2. **Body Paragraph**
+            - Describe the animal (appearance, behavior).
+        3. **Conclusion**
+            - Summarize why you like this animal.
+
+        **Word Count Expectation:** 📏
+        - Total Words: 100-150
+        - Lines: 10-12
+
+        **Additional Notes:** 💡
+        - Use simple vocabulary and short sentences.
+        - Use linking words like "and" and "because".
+        - Leave blank lines between sections for clarity.
+
+        Respond ONLY in Markdown, following this style."""
 
         messages_for_topic = [
             {"role": "system", "content": system_prompt},
@@ -112,21 +144,25 @@ class WritingTutor(BaseTutor):
         """
         if not history or not isinstance(history, list):
             logging.warning("play_audio called with empty or invalid history.")
+
             return None
 
         last_assistant_message = next((m for m in reversed(history) if m.get("role") == "assistant"), None)
 
         if not last_assistant_message:
             logging.info("No assistant message found in history, no audio to play.")
+
             return None
 
         text_to_speak = last_assistant_message.get("content")
         if not text_to_speak:
             logging.warning("Assistant message is empty, nothing to speak.")
+
             return None
 
         if not self.openai_service:
             logging.error("OpenAI service not available in WritingTutor for text-to-speech.")
+
             return None
 
         try:

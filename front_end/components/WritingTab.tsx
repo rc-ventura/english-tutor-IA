@@ -28,37 +28,69 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
     };
   }, []);
 
-  const handleGenerateTopic = async () => {
+  // Streaming: mantém referência para cancelar caso o usuário clique várias vezes
+  const topicJobRef = useRef<null | (() => void)>(null);
+
+  const handleGenerateTopic = () => {
     setIsLoading(true);
     setFeedbackMessages([]);
     setHasEvaluated(false);
-    try {
-      const newMessages = await api.generateRandomTopic(englishLevel, writingType);
-      setFeedbackMessages(newMessages);
-    } catch (error) {
-      console.error("Failed to generate topic:", error);
-      setFeedbackMessages([{ role: 'assistant', content: 'Sorry, I could not generate a topic right now.' }]);
-    } finally {
+    // Cancela streaming anterior, se houver
+    if (topicJobRef.current) topicJobRef.current();
+    let lastMessages: ChatMessage[] = [];
+    topicJobRef.current = api.generateRandomTopicStream(
+      englishLevel,
+      writingType,
+      (messages) => {
+        lastMessages = messages;
+        setFeedbackMessages(messages);
+      },
+      (error) => {
+        console.error("Failed to generate topic (stream):", error);
+        setFeedbackMessages([{ role: 'assistant', content: 'Sorry, I could not generate a topic right now.' }]);
+        setIsLoading(false);
+      }
+    );
+    // Finaliza loading quando acabar o stream
+    // Como não temos callback "done" do Gradio, faz um pequeno delay após última mensagem
+    setTimeout(() => {
       setIsLoading(false);
-    }
+    }, 800);
   };
 
-  const handleEvaluate = async () => {
+
+  const handleEvaluate = () => {
     if (!essayText.trim()) return;
     setIsLoading(true);
+    setHasEvaluated(false);
 
-    try {
-        const newMessages = await api.processInput(essayText, writingType, englishLevel);
-        setFeedbackMessages(newMessages);
-        setHasEvaluated(true);
-    } catch (error) {
-        console.error("Failed to evaluate essay:", error);
-        const errorMsg: ChatMessage = { role: 'assistant', content: 'An error occurred during evaluation.' };
-        setFeedbackMessages(prev => [...prev, errorMsg]);
-    } finally {
+    let lastTimeout: NodeJS.Timeout | null = null;
+    let lastMessages: ChatMessage[] = [];
+
+    const cancel = api.processInputStream(
+      essayText,
+      writingType,
+      englishLevel,
+      feedbackMessages,
+      (messages) => {
+        lastMessages = messages;
+        setFeedbackMessages(messages);
+        // Reinicia o timeout a cada chunk recebido
+        if (lastTimeout) clearTimeout(lastTimeout);
+        lastTimeout = setTimeout(() => {
+          setIsLoading(false);
+          setHasEvaluated(true);
+        }, 800); // considera stream finalizado após 800ms sem novos dados
+      },
+      (error) => {
         setIsLoading(false);
-    }
+        setFeedbackMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred during evaluation.' }]);
+      }
+    );
+    // Opcional: retornar cancel para permitir interrupção futura
+    return cancel;
   };
+
 
   const handlePlayAudio = async () => {
     try {

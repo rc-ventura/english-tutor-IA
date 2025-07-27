@@ -144,21 +144,25 @@ class WritingTutor(BaseTutor):
         """
         if not history or not isinstance(history, list):
             logging.warning("play_audio called with empty or invalid history.")
+
             return None
 
         last_assistant_message = next((m for m in reversed(history) if m.get("role") == "assistant"), None)
 
         if not last_assistant_message:
             logging.info("No assistant message found in history, no audio to play.")
+
             return None
 
         text_to_speak = last_assistant_message.get("content")
         if not text_to_speak:
             logging.warning("Assistant message is empty, nothing to speak.")
+
             return None
 
         if not self.openai_service:
             logging.error("OpenAI service not available in WritingTutor for text-to-speech.")
+
             return None
 
         try:

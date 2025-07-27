@@ -123,19 +123,10 @@ class GradioInterface:
                         ],
                         value="Daily Journal",
                         container=True,
+                        elem_id="writing-type",
                     )
 
-                with gr.Row(elem_id="writing-button-row"):
-                    generate_topic_btn = gr.Button(
-                        "Start",
-                        elem_classes="gradio-button",
-                    )
-                    evaluate_essay_btn = gr.Button(
-                        "Evaluate",
-                        variant="primary",
-                        elem_classes="gradio-button",
-                        elem_id="evaluate-essay-btn",
-                    )
+                # with gr.Row(elem_id="writing-button-row"):
 
                 with gr.Column():
                     with gr.Row(elem_id="writing-row"):
@@ -158,11 +149,22 @@ class GradioInterface:
                         )
 
                 with gr.Row(elem_id="writing-buttons"):
-                    play_audio_btn = gr.Button("🗣️", elem_classes="gradio-button", elem_id="play-audio-btn")
+                    generate_topic_btn = gr.Button(
+                        "Start",
+                        elem_classes="gradio-button",
+                    )
+                    evaluate_essay_btn = gr.Button(
+                        "Evaluate",
+                        variant="primary",
+                        elem_classes="gradio-button",
+                        elem_id="evaluate-essay-btn",
+                    )
+
+                    play_audio_btn = gr.Button("playback", elem_classes="gradio-button", elem_id="play-audio-btn")
                     clear_writing_btn = gr.Button("Clear", elem_classes="gradio-button", elem_id="clear-essay-btn")
 
                 audio_output_writing = gr.Audio(
-                    visible=True, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
+                    visible=False, autoplay=True, label="Feedback Audio", elem_id="audio-output-writing"
                 )
 
                 generate_topic_btn.click(

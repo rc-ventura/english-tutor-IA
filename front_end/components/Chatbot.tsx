@@ -8,6 +8,23 @@ interface ChatbotProps {
   isLoading: boolean;
 }
 
+/**
+ * Renders a single chat message bubble.
+ *
+ * The message bubble is a container component that renders a single chat message.
+ * It takes a `message` prop which is an object with a `role` property (either
+ * "user" or "assistant") and a `content` property which can be either a string
+ * or a JSX node.
+ *
+ * If `message.role` is "assistant", it renders a bot icon on the left side
+ * and a copy button on the right side of the message bubble.
+ *
+ * If `message.role` is "user", it renders a user icon on the right side of
+ * the message bubble.
+ *
+ * The message bubble is styled with Tailwind CSS classes and uses the
+ * `prose` plugin to add some basic styling to the message content.
+ */
 const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   const isUser = message.role === "user";
   const handleCopy = () => {

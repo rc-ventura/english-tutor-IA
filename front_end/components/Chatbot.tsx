@@ -27,14 +27,20 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
         </div>
       )}
       <div
-        className={`relative max-w-lg px-4 py-3 rounded-xl shadow ${
+        className={`relative max-w-3xl px-4 py-3 rounded-xl shadow ${
           isUser
             ? "bg-indigo-600 text-white rounded-br-none"
             : "bg-gray-700 text-gray-200 rounded-bl-none"
         }`}
       >
-        <div className="prose prose-sm prose-invert max-w-none prose-p:my-2">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+        <div
+          className="
+            prose prose-invert max-w-3xl
+            prose-p:my-1 prose-li:my-0.5 prose-ul:my-0.5 prose-ol:my-0.5
+            prose-h1:my-2 prose-h2:my-1 prose-h3:my-1 prose-h4:my-1 prose-h5:my-1 prose-h6:my-1
+            whitespace-pre-line break-words"
+        >
+          <ReactMarkdown skipHtml>{message.content}</ReactMarkdown>
         </div>
         {!isUser && typeof message.content === "string" && (
           <button

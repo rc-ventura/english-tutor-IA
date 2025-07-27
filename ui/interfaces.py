@@ -19,15 +19,6 @@ class GradioInterface:
     def __init__(self, tutor: "EnglishTutor"):
         self.tutor = tutor
 
-    # def set_api_key_ui(self, api_key: str):
-    #     """UI wrapper for setting the API key. Handles exceptions and returns Gradio feedback."""
-    #     try:
-    #         self.tutor.set_api_key(api_key)
-    #         return gr.Success("✅ API key set successfully!")
-    #     except ValueError as e:
-    #         print(f"❌ ValueError: {str(e)}")
-    #         return gr.Error(f"❌ {str(e)}")
-
     def get_progress_html(self):
         """Return the current user progress dashboard HTML."""
         return self.tutor.progress_tracker.html_dashboard()

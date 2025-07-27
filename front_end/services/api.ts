@@ -164,18 +164,65 @@ export const generateRandomTopic = async (
   return formatMessages(rawMessages);
 };
 
+// PROCESSAR REDAÇÃO (STREAMING)
+export const processInputStream = (
+  essayText: string,
+  writingType: WritingType,
+  level: EnglishLevel,
+  history: ChatMessage[],
+  onData: (messages: ChatMessage[]) => void,
+  onError: (error: Error) => void
+) => {
+  let job;
+  const process = async () => {
+    try {
+      const client = await getClient();
+      // Ordem: essay_input_text, history_writing, english_level, writing_type
+      job = client.submit("/evaluate_essay", [
+        essayText,
+        history,
+        level,
+        writingType,
+      ]);
+      (async () => {
+        try {
+          for await (const msg of job) {
+            if (msg.type === "data") {
+              const [rawMessages] = msg.data as [any[]];
+              onData(formatMessages(rawMessages));
+            } else if (msg.type === "status" && msg.stage === "error") {
+              onError(new Error(msg.message ?? "Streaming error"));
+            }
+          }
+        } catch (streamErr) {
+          onError(streamErr as Error);
+        }
+      })();
+    } catch (error) {
+      onError(error as Error);
+    }
+  };
+  process();
+  return () => {
+    if (job) job.cancel();
+  };
+};
+
 // PROCESSAR REDAÇÃO
 export const processInput = async (
   essayText: string,
   writingType: WritingType,
-  level: EnglishLevel
+  level: EnglishLevel,
+  history: ChatMessage[]
 ): Promise<ChatMessage[]> => {
   const client = await getClient();
-  const response = await client.predict("/process_input", {
-    input_data: essayText,
-    writing_type: writingType,
-    level: level,
-  });
+  // Ordem: essay_input_text, history_writing, english_level, writing_type
+  const response = await client.predict("/evaluate_essay", [
+    essayText,
+    history,
+    level,
+    writingType,
+  ]);
   const rawMessages = (response.data as GradioEvaluationPayload)[0];
   return formatMessages(rawMessages);
 };

@@ -3,5 +3,6 @@
   "description": "An AI-powered English tutor designed to enhance your language skills. Practice speaking through interactive conversations and refine your writing with AI-driven feedback and topic generation. Track your progress with a personalized dashboard.",
   "requestFramePermissions": [
     "microphone"
-  ]
+  ],
+  "prompt": ""
 }

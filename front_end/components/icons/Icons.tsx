@@ -337,3 +337,108 @@ export const LockIcon: React.FC<IconProps> = (props) => (
     />
   </svg>
 );
+
+// --- Badge Icons ---
+export const FirstStepsIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 22c-3.14-2.03-5-5.5-5-9.5 0-3.58 2.92-6.5 6.5-6.5s6.5 2.92 6.5 6.5c0 4-1.86 7.47-5 9.5Z" />
+    <path d="M16 16.5c-1.5-1-3.5-1-5 0" />
+    <path d="M18 13.5c-1.5-1-3.5-1-5 0" />
+  </svg>
+);
+export const GettingWarmerIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M14.5 4.5c.9-.9 2.1-.9 3 0s.9 2.1 0 3L12 13l-3-3 5.5-5.5z" />
+    <path d="M14 10.5a5.5 5.5 0 1 1-8 0c0-2.5 1-5.5 4-7.5 3 2 4 5 4 7.5z" />
+  </svg>
+);
+export const RisingStarIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+  </svg>
+);
+export const MasterIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 6L4 10l8 6 8-6-8-4z" />
+    <path d="M4 10v4l8 6 8-6v-4" />
+  </svg>
+);
+export const WordsmithIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M22 10.5V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12.5" />
+    <path d="M16 22.5a2.5 2.5 0 0 0 2.5-2.5V15l-5 5Z" />
+    <path d="M15 16l5 5" />
+  </svg>
+);
+export const GrammarGuruIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);

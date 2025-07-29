@@ -20,10 +20,12 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),
+        "@gradio/client": path.resolve(
+          __dirname,
+          "./node_modules/@gradio/client/dist/index.js"
+        ),
       },
-    },
-    optimizeDeps: {
-      exclude: ["@gradio/client"],
+      dedupe: ["@gradio/client"],
     },
   };
 });

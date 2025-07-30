@@ -1,6 +1,7 @@
 import { Buffer } from "buffer";
 window.Buffer = Buffer;
 
+import "./chat-markdown.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

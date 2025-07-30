@@ -1,0 +1,31 @@
+/* Ajusta o espaçamento entre parágrafos e listas dentro do bubble do chat */
+.chat-markdown > p,
+.chat-markdown > ul,
+.chat-markdown > ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.chat-markdown ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  margin-left: 1.5em;
+  padding-left: 0;
+  margin-bottom: 2.25em;
+}
+
+.chat-markdown ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  margin-left: 1.5em;
+  padding-left: 0;
+  margin-bottom: 2.25em;
+}
+
+.chat-markdown li {
+  margin-bottom: 1.15em;
+}
+
+.chat-markdown p {
+  margin-bottom: 1em;
+}

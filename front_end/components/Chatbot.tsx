@@ -53,11 +53,15 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
         <div
           className="
             prose prose-invert max-w-3xl
-            prose-p:my-1 prose-li:my-0.5 prose-ul:my-0.5 prose-ol:my-0.5
-            prose-h1:my-2 prose-h2:my-1 prose-h3:my-1 prose-h4:my-1 prose-h5:my-1 prose-h6:my-1
-            whitespace-pre-line break-words"
+            prose-p:my-1 prose-li:my-1 prose-ul:my-1 prose-ol:my-1
+            prose-h1:my-1 prose-h2:my-0.5 prose-h3:my-0.5 prose-h4:my-0.5 prose-h5:my-0.5 prose-h6:my-0.5
+            whitespace-normal break-words chat-markdown"
         >
-          <ReactMarkdown skipHtml>{message.content}</ReactMarkdown>
+          <ReactMarkdown skipHtml>
+            {typeof message.content === "string"
+              ? message.content.replace(/\n{3,}/g, "\n\n")
+              : ""}
+          </ReactMarkdown>
         </div>
         {!isUser && typeof message.content === "string" && (
           <button

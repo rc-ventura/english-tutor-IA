@@ -64,7 +64,13 @@ class GradioInterface:
                         elem_id="level-select",
                     )
 
-                status_text = gr.Textbox(label="Status", interactive=False, visible=True, lines=2)
+                status_text = gr.Textbox(
+                    label="Status",
+                    interactive=False,
+                    visible=True,
+                    lines=2,
+                    value=self.tutor.api_key_status,
+                )
 
             set_key_btn.click(
                 fn=self.tutor.set_api_key, inputs=[api_key_box], outputs=[status_text], api_name="set_api_key_ui"
@@ -73,6 +79,12 @@ class GradioInterface:
             clear_key_btn.click(fn=lambda: (None, None), inputs=None, outputs=[api_key_box, status_text])
 
             with gr.Tab("Speaking Skills"):
+                speaking_mode = gr.Radio(
+                    ["Hybrid (Text & Audio)", "Immersive (Audio-Only)"],
+                    label="Practice Mode",
+                    value="Hybrid (Text & Audio)",
+                    elem_id="speaking-mode-radio",
+                )
                 chatbot_speaking = gr.Chatbot(
                     label="Speaking Conversation",
                     height=500,
@@ -95,12 +107,12 @@ class GradioInterface:
                 )
                 audio_input_mic.stop_recording(
                     fn=self.tutor.speaking_tutor.handle_transcription,
-                    inputs=[history_speaking, audio_input_mic, english_level],
+                    inputs=[history_speaking, audio_input_mic, english_level, speaking_mode],
                     outputs=[chatbot_speaking, history_speaking],
                     api_name="speaking_transcribe",
                 ).then(
                     fn=self.tutor.speaking_tutor.handle_bot_response,
-                    inputs=[history_speaking, english_level],
+                    inputs=[history_speaking, english_level, speaking_mode],
                     outputs=[chatbot_speaking, history_speaking, audio_output_speaking],
                     api_name="speaking_bot_response",
                 ).then(

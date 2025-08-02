@@ -91,6 +91,13 @@ class EnglishTutor:
         """Initialize configuration."""
         load_dotenv(override=True)
         self.openai_api_key = os.getenv("OPENAI_API_KEY") or ""
+        if self.openai_api_key:
+            if OpenAIService.is_key_valid(self.openai_api_key):
+                self.api_key_status = "✅ API key set successfully!"
+            else:
+                self.api_key_status = "🚫 Invalid API key found in environment."
+        else:
+            self.api_key_status = "⚠️ No API key found. Please enter your OpenAI API key."
 
     def get_system_message(self, mode: str = "speaking", level: Optional[str] = None) -> str:
         """Get the appropriate system message based on tutoring mode."""

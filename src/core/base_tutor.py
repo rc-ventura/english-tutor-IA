@@ -18,5 +18,6 @@ class BaseTutor(ABC):
         input_data: Any | None = None,
         history: Optional[List[Dict[str, Any]]] = None,
         level: Optional[str] = None,
+        speaking_mode: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]], None, None]:
         """Process user input and return chatbot messages and updated history."""

@@ -1,10 +1,9 @@
-import React from "react";
 import { ENGLISH_LEVELS, WRITING_TYPES } from "./constants";
 
 export type ChatMessage = {
   role: "user" | "assistant";
-  content: string | React.ReactNode;
-  audioUrl?: string;
+  content: any; // Can be string or Gradio file object { file: { url: string } }
+  text_for_llm?: string; // Holds transcription for audio messages
 };
 
 export type EnglishLevel = (typeof ENGLISH_LEVELS)[number];

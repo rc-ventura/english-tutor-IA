@@ -442,3 +442,39 @@ export const GrammarGuruIcon: React.FC<IconProps> = (props) => (
     <path d="m9 12 2 2 4-4" />
   </svg>
 );
+
+export const HeadphonesIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M18 8a6 6 0 0 0-12 0v7c0 1.7 1.3 3 3 3h1a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-1a2 2 0 0 1 2-2h1c1.7 0 3-1.3 3-3Z" />
+  </svg>
+);
+
+export const MessageSquareTextIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <path d="M13 8H7" />
+    <path d="M17 12H7" />
+  </svg>
+);

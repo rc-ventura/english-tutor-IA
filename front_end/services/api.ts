@@ -1,7 +1,6 @@
 import { Client, handle_file } from "@gradio/client";
 import type { EnglishLevel, WritingType, ChatMessage } from "../types";
 import type {
-  GradioBotResponsePayload,
   GradioFile,
   GradioProgressPayload,
   GradioTopicPayload,
@@ -9,13 +8,10 @@ import type {
   GradioAudioPlaybackPayload,
 } from "./gradio";
 
-const BASE_URL = "http://localhost:7901";
+const BASE_URL = import.meta.env.VITE_GRADIO_BASE_URL;
 
 // Conecta ao cliente Gradio usando o endpoint correto
-const clientPromise = Client.connect(BASE_URL, {
-  protocol: "http",
-  host: "localhost:7901",
-}).catch((error) => {
+const clientPromise = Client.connect(BASE_URL).catch((error) => {
   console.error("Falha ao conectar ao Gradio API:", error);
   return Promise.reject(error);
 });
@@ -57,10 +53,11 @@ export const setApiKey = async (apiKey: string): Promise<string> => {
 export const handleTranscriptionAndResponse = (
   audioBlob: Blob,
   level: EnglishLevel,
+  practiceMode: "hybrid" | "immersive",
   onData: (data: { messages: ChatMessage[]; audioUrl: string | null }) => void,
   onError: (error: Error) => void
 ) => {
-  let job;
+  let job: ReturnType<Client['submit']>;
 
   const process = async () => {
     try {
@@ -70,16 +67,20 @@ export const handleTranscriptionAndResponse = (
       await client.predict("/speaking_transcribe", {
         audio_filepath: await handle_file(audioBlob),
         level,
+        speaking_mode: practiceMode === "hybrid" ? "Hybrid" : "Immersive",
       });
 
       // Step 2: Once transcription is done, submit the job to stream the bot's response.
-      job = client.submit("/speaking_bot_response", { level });
+      job = client.submit("/speaking_bot_response", {
+        level,
+        speaking_mode: practiceMode === "hybrid" ? "Hybrid" : "Immersive",
+      });
 
       (async () => {
         try {
           for await (const msg of job) {
             if (msg.type === "data") {
-              console.log("🟣 Gradio streaming raw msg.data:", msg.data);
+              console.log(" Gradio streaming raw msg.data:", msg.data);
               const [rawMessages, audioFile] = msg.data as [any[], any];
               onData({
                 messages: formatMessages(rawMessages),
@@ -118,7 +119,7 @@ export const generateRandomTopicStream = (
   onData: (messages: ChatMessage[]) => void,
   onError: (error: Error) => void
 ) => {
-  let job;
+  let job: ReturnType<Client['submit']>;
   const process = async () => {
     try {
       const client = await getClient();
@@ -173,7 +174,7 @@ export const processInputStream = (
   onData: (messages: ChatMessage[]) => void,
   onError: (error: Error) => void
 ) => {
-  let job;
+  let job: ReturnType<Client['submit']>;
   const process = async () => {
     try {
       const client = await getClient();

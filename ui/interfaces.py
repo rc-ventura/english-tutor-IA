@@ -34,6 +34,7 @@ class GradioInterface:
             history_speaking = gr.State([])
             history_writing = gr.State([])
             english_level = gr.State("B1")  # default level
+            speaking_mode = gr.State("Hybrid")  # default mode
 
             with gr.Sidebar():
                 gr.Image(value="assets/sophia-ia.png", height=150, width=150, show_label=False, elem_id="sidebar-logo")
@@ -80,11 +81,12 @@ class GradioInterface:
 
             with gr.Tab("Speaking Skills"):
                 speaking_mode = gr.Radio(
-                    ["Hybrid (Text & Audio)", "Immersive (Audio-Only)"],
+                    ["Hybrid", "Immersive"],
                     label="Practice Mode",
-                    value="Hybrid (Text & Audio)",
-                    elem_id="speaking-mode-radio",
+                    value="Hybrid",
+                    elem_id="speaking_mode-radio",
                 )
+
                 chatbot_speaking = gr.Chatbot(
                     label="Speaking Conversation",
                     height=500,

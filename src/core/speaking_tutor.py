@@ -24,6 +24,7 @@ class SpeakingTutor(BaseTutor):
         input_data: Optional[str],
         history: Optional[List[Dict[str, Any]]],
         level: Optional[str] = None,
+        speaking_mode: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]], None, None]:
         """
         Processes user audio input synchronously, fulfilling the BaseTutor contract.
@@ -46,6 +47,7 @@ class SpeakingTutor(BaseTutor):
         history: Optional[List[Dict[str, Any]]],
         audio_filepath: Optional[str] = None,
         level: Optional[str] = None,
+        speaking_mode: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Transcribes user audio, adds it to history, and returns the updated history."""
         current_history = history.copy() if history else []
@@ -59,11 +61,27 @@ class SpeakingTutor(BaseTutor):
             return current_history, current_history
 
         if not audio_filepath or not os.path.exists(audio_filepath):
+            _logger.warning("Audio file not provided or does not exist.")
+            return current_history, current_history
+
+        # Check if the audio file is too small (likely an empty recording)
+        min_audio_size_bytes = 1024  # 1 KB
+        if os.path.getsize(audio_filepath) < min_audio_size_bytes:
+            _logger.error(f"Audio file at {audio_filepath} is too small, likely an empty recording.")
+            error_message = {
+                "role": "assistant",
+                "content": "It seems the audio was empty. Please try recording again.",
+            }
+            current_history.append(error_message)
             return current_history, current_history
 
         try:
             transcription = self.tutor_parent.openai_service.transcribe_audio(audio_filepath)
-            user_message = {"role": "user", "content": transcription}
+            if speaking_mode == "Immersive":
+                user_message = {"role": "user", "content": (audio_filepath, None), "text_for_llm": transcription}
+            else:
+                user_message = {"role": "user", "content": transcription}
+
             current_history.append(user_message)
             return current_history, current_history
         except Exception as e:
@@ -75,6 +93,7 @@ class SpeakingTutor(BaseTutor):
         self,
         history: Optional[List[Dict[str, Any]]],
         level: Optional[str] = None,
+        speaking_mode: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]], None, None]:
         """
         Gets bot response, yields audio for immediate playback, waits for it to finish,
@@ -97,18 +116,16 @@ class SpeakingTutor(BaseTutor):
         system_prompt = self.tutor_parent.get_system_message(mode="speaking", level=level)
 
         # Sanitize history to prevent audio generation bugs.
-        sanitized_history = []
-        last_assistant_idx = -1
-        for i in range(len(current_history) - 1, -1, -1):
-            if current_history[i].get("role") == "assistant":
-                last_assistant_idx = i
-                break
+        messages_for_llm = []
+        for message in current_history:
+            llm_message = {"role": message["role"]}
+            if "text_for_llm" in message:
+                llm_message["content"] = message["text_for_llm"]
+            else:
+                llm_message["content"] = message["content"]
+            messages_for_llm.append(llm_message)
 
-        for i, message in enumerate(current_history):
-            if message.get("role") == "user" or i == last_assistant_idx:
-                sanitized_history.append(message)
-
-        messages_for_llm = [{"role": "system", "content": system_prompt}] + sanitized_history
+        messages_for_llm = [{"role": "system", "content": system_prompt}] + messages_for_llm
 
         try:
             _logger.info(f"Sending {len(messages_for_llm)} messages to chat_multimodal.")
@@ -139,6 +156,18 @@ class SpeakingTutor(BaseTutor):
             audio_bytes = base64.b64decode(audio_base64_data)
             audio_path = save_audio_to_temp_file(audio_bytes)
 
+            if speaking_mode == "Immersive":
+                # In immersive mode, just add the audio player to the chat
+                _logger.info("Immersive mode: Yielding audio for playback.")
+                bot_message = {
+                    "role": "assistant",
+                    "content": (audio_path, None),
+                    "text_for_llm": bot_text_response,
+                }
+                current_history.append(bot_message)
+                yield current_history, current_history, audio_path
+                return
+
             # 1. Yield audio for immediate playback, without updating the chat text.
             _logger.info("Audio-first UX: Yielding audio for playback.")
             yield current_history, current_history, audio_path
@@ -163,7 +192,7 @@ class SpeakingTutor(BaseTutor):
                 current_history[-1]["content"] += word + " "
 
                 # Yield the updated state to the UI
-                yield current_history, current_history, audio_path
+                yield current_history, current_history, None  # audio_path
 
                 # Control the streaming speed for a natural feel
                 time.sleep(0.05)

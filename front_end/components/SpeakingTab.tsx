@@ -1,7 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChatMessage, EnglishLevel } from "../types";
 import Chatbot from "./Chatbot";
-import { MicIcon, StopCircleIcon } from "./icons/Icons";
+import {
+  MicIcon,
+  StopCircleIcon,
+  HeadphonesIcon,
+  MessageSquareTextIcon,
+} from "./icons/Icons";
 import * as api from "../services/api";
 
 interface SpeakingTabProps {
@@ -9,6 +14,9 @@ interface SpeakingTabProps {
 }
 
 const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
+  const [practiceMode, setPracticeMode] = useState<"hybrid" | "immersive">(
+    "hybrid"
+  );
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "assistant",
@@ -89,8 +97,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
-      console.log("🔊 Starting audio playback...");
-      source.start(0);
+
+      // FIX: Add a small delay to prevent audio quality issues on autoplay
+      const playTimeout = setTimeout(() => {
+        console.log("🔊 Starting audio playback after short delay...");
+        source.start(0);
+      }, 150); // 150ms delay is enough for the browser to settle.
+
       source.onended = () => {
         console.log("🔊 Audio playback finished");
       };
@@ -112,6 +125,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
 
   const handleStartRecording = async () => {
     unlockAudioContext(); // Unlock audio on user gesture
+    audioPlayedRef.current = false; // Reset for the new interaction
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -134,8 +148,6 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         };
         setMessages((prev) => [...prev, userPlaceholder]);
 
-        audioPlayedRef.current = false; // Reset for the new response
-
         const handleError = (error: Error) => {
           console.error("Streaming Error:", error);
           setMessages((prev) => [
@@ -149,6 +161,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         streamingJobRef.current = api.handleTranscriptionAndResponse(
           audioBlob,
           englishLevel,
+          practiceMode,
           (data) => {
             // onData callback
             const { messages, audioUrl } = data;
@@ -182,14 +195,53 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
 
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto">
-      <div className="flex-1 overflow-y-auto pr-4">
-        <Chatbot messages={messages} isLoading={isLoading} />
+      <div className="flex justify-center mb-6">
+        <fieldset
+          className="bg-gray-800 p-1 rounded-full flex items-center space-x-1 border border-gray-700"
+          disabled={isLoading || isRecording}
+          aria-label="Practice Mode"
+        >
+          <button
+            onClick={() => setPracticeMode("hybrid")}
+            className={`relative flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:ring-white disabled:opacity-50 ${
+              practiceMode === "hybrid"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-400 hover:bg-gray-700"
+            }`}
+            aria-pressed={practiceMode === "hybrid"}
+          >
+            <MessageSquareTextIcon className="w-5 h-5" />
+            Hybrid
+          </button>
+          <button
+            onClick={() => setPracticeMode("immersive")}
+            className={`relative flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:ring-white disabled:opacity-50 ${
+              practiceMode === "immersive"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-400 hover:bg-gray-700"
+            }`}
+            aria-pressed={practiceMode === "immersive"}
+          >
+            <HeadphonesIcon className="w-5 h-5" />
+            Immersive
+          </button>
+        </fieldset>
       </div>
+
+      <div className="flex-1 overflow-y-auto pr-4">
+        <Chatbot
+          messages={messages}
+          isLoading={isLoading}
+          practiceMode={practiceMode}
+        />
+      </div>
+
       <div className="mt-6">
         <div className="flex flex-col items-center justify-center">
           <button
             onClick={handleToggleRecording}
-            className={`flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-opacity-50
+            disabled={isLoading}
+            className={`flex items-center justify-center w-20 h-20 rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-wait
                     ${
                       isRecording
                         ? "bg-red-600 hover:bg-red-700 focus:ring-red-400"

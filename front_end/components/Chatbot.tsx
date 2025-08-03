@@ -3,35 +3,105 @@ import { ChatMessage } from "../types";
 import { UserIcon, BrainCircuitIcon, CopyIcon } from "./icons/Icons";
 import ReactMarkdown from "react-markdown";
 
+// --- Local Type Definitions for Clarity ---
+interface GradioFile {
+  url?: string;
+}
+
+interface GradioMessageContent {
+  file?: GradioFile;
+}
+
+// --- Component Props ---
 interface ChatbotProps {
   messages: ChatMessage[];
   isLoading: boolean;
+  practiceMode: "hybrid" | "immersive";
 }
 
-/**
- * Renders a single chat message bubble.
- *
- * The message bubble is a container component that renders a single chat message.
- * It takes a `message` prop which is an object with a `role` property (either
- * "user" or "assistant") and a `content` property which can be either a string
- * or a JSX node.
- *
- * If `message.role` is "assistant", it renders a bot icon on the left side
- * and a copy button on the right side of the message bubble.
- *
- * If `message.role` is "user", it renders a user icon on the right side of
- * the message bubble.
- *
- * The message bubble is styled with Tailwind CSS classes and uses the
- * `prose` plugin to add some basic styling to the message content.
- */
-const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
+interface ChatMessageBubbleProps {
+  message: ChatMessage;
+  practiceMode: "hybrid" | "immersive";
+  isLastMessage: boolean;
+}
+
+// --- Helper Functions ---
+const isGradioAudioContent = (
+  content: any
+): content is GradioMessageContent => {
+  return (
+    typeof content === "object" &&
+    content !== null &&
+    "file" in content &&
+    typeof content.file === "object" &&
+    content.file !== null &&
+    "url" in content.file
+  );
+};
+
+// --- Main Components ---
+
+const AudioPlayer: React.FC<{ src: string }> = ({ src }) => {
+  // Removed the useEffect for autoplay. This component now only renders the controls.
+  // The autoplay is handled by SpeakingTab.tsx using the Web Audio API.
+  return (
+    <audio controls src={src} className="w-full" style={{ minWidth: 200 }} />
+  );
+};
+
+const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
+  message,
+  practiceMode,
+  isLastMessage,
+}) => {
   const isUser = message.role === "user";
+
   const handleCopy = () => {
-    if (typeof message.content === "string") {
-      navigator.clipboard.writeText(message.content);
+    const textToCopy =
+      typeof message.content === "string"
+        ? message.content
+        : message.text_for_llm;
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
     }
   };
+
+  const renderContent = () => {
+    if (practiceMode === "immersive") {
+      // --- Immersive Mode Rendering ---
+      if (isGradioAudioContent(message.content) && message.content.file?.url) {
+        return <AudioPlayer src={message.content.file.url} />;
+      } else if (typeof message.content === "string") {
+        return (
+          <div
+            className={message.content.includes("Error") ? "text-red-400" : ""}
+          >
+            {message.content}
+          </div>
+        );
+      } else {
+        // Placeholder for user or assistant while processing
+        const placeholder = isUser
+          ? "⏳ Processando sua fala..."
+          : "⏳ Gerando resposta...";
+        return <div style={{ color: "#aaa" }}>{placeholder}</div>;
+      }
+    } else {
+      // --- Hybrid Mode Rendering ---
+      const text =
+        typeof message.content === "string"
+          ? message.content
+          : message.text_for_llm || "";
+      return (
+        <div className="prose prose-invert max-w-3xl whitespace-normal break-words chat-markdown">
+          <ReactMarkdown skipHtml>
+            {text.replace(/\n{3,}/g, "\n\n")}
+          </ReactMarkdown>
+        </div>
+      );
+    }
+  };
+
   return (
     <div
       className={`flex items-start gap-3 my-4 ${
@@ -44,29 +114,18 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
         </div>
       )}
       <div
-        className={`relative max-w-3xl px-4 py-3 rounded-xl shadow ${
+        className={`relative px-4 py-3 rounded-2xl max-w-[80%] md:max-w-[70%] lg:max-w-[60%] ${
           isUser
-            ? "bg-indigo-600 text-white rounded-br-none"
+            ? "bg-indigo-500 text-white rounded-br-none"
             : "bg-gray-700 text-gray-200 rounded-bl-none"
         }`}
       >
-        <div
-          className="
-            prose prose-invert max-w-3xl
-            prose-p:my-1 prose-li:my-1 prose-ul:my-1 prose-ol:my-1
-            prose-h1:my-1 prose-h2:my-0.5 prose-h3:my-0.5 prose-h4:my-0.5 prose-h5:my-0.5 prose-h6:my-0.5
-            whitespace-normal break-words chat-markdown"
-        >
-          <ReactMarkdown skipHtml>
-            {typeof message.content === "string"
-              ? message.content.replace(/\n{3,}/g, "\n\n")
-              : ""}
-          </ReactMarkdown>
-        </div>
-        {!isUser && typeof message.content === "string" && (
+        {renderContent()}
+        {!isUser && practiceMode === "hybrid" && (
           <button
             onClick={handleCopy}
-            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-white transition-colors"
+            className="absolute top-1 right-1 p-1 text-gray-400 hover:text-white transition-colors"
+            aria-label="Copy message"
           >
             <CopyIcon className="w-4 h-4" />
           </button>
@@ -81,45 +140,47 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
   );
 };
 
-const LoadingIndicator: React.FC = () => (
-  <div className="flex items-start gap-3 my-4 justify-start">
-    <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
-      <BrainCircuitIcon className="w-6 h-6 text-white" />
-    </div>
-    <div className="bg-gray-700 text-gray-200 rounded-xl rounded-bl-none px-4 py-3 shadow">
-      <div className="flex items-center justify-center space-x-1">
-        <div
-          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-          style={{ animationDelay: "0s" }}
-        ></div>
-        <div
-          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-          style={{ animationDelay: "0.2s" }}
-        ></div>
-        <div
-          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-          style={{ animationDelay: "0.4s" }}
-        ></div>
-      </div>
-    </div>
-  </div>
-);
-
-const Chatbot: React.FC<ChatbotProps> = ({ messages, isLoading }) => {
+const Chatbot: React.FC<ChatbotProps> = ({
+  messages,
+  isLoading,
+  practiceMode,
+}) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isLoading]);
+  }, [messages]);
 
   return (
-    <div ref={scrollRef} className="h-full overflow-y-auto">
-      {messages.map((msg, index) => (
-        <ChatMessageBubble key={index} message={msg} />
-      ))}
-      {isLoading && <LoadingIndicator />}
+    <div
+      ref={scrollRef}
+      className="flex-1 overflow-y-auto p-4 pr-6 bg-gray-800"
+    >
+      <div className="max-w-4xl mx-auto">
+        {messages.map((message, index) => (
+          <ChatMessageBubble
+            key={index}
+            message={message}
+            practiceMode={practiceMode}
+            isLastMessage={index === messages.length - 1}
+          />
+        ))}
+        {isLoading && (
+          <div className="flex justify-start items-center gap-3 my-4">
+            <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
+              <BrainCircuitIcon className="w-6 h-6 text-white" />
+            </div>
+            <div className="px-4 py-3 rounded-2xl bg-gray-700 text-gray-200">
+              <div className="flex items-center space-x-2">
+                <div className="dot-flashing"></div>
+                <span className="text-sm">Sophia is thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

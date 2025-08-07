@@ -193,6 +193,28 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
     }
   };
 
+  const handleModeChange = (newMode: "hybrid" | "immersive") => {
+    setPracticeMode(newMode);
+
+    if (newMode === "immersive") {
+      // Verifica se a última mensagem é de áudio antes de tocar
+      const lastMessage = messages[messages.length - 1];
+
+      if (
+        lastMessage.role === "assistant" &&
+        lastMessage.content &&
+        typeof lastMessage.content === "object" &&
+        "file" in lastMessage.content &&
+        (lastMessage.content.file as any)?.url
+      ) {
+        const audioUrl = (lastMessage.content as any).file.url;
+        if (audioUrl && typeof audioUrl === "string") {
+          playAudio(audioUrl);
+        }
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-full max-w-4xl mx-auto">
       <div className="flex justify-center mb-6">
@@ -202,7 +224,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           aria-label="Practice Mode"
         >
           <button
-            onClick={() => setPracticeMode("hybrid")}
+            onClick={() => handleModeChange("hybrid")}
             className={`relative flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:ring-white disabled:opacity-50 ${
               practiceMode === "hybrid"
                 ? "bg-indigo-600 text-white"
@@ -214,7 +236,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             Hybrid
           </button>
           <button
-            onClick={() => setPracticeMode("immersive")}
+            onClick={() => handleModeChange("immersive")}
             className={`relative flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 focus-visible:ring-white disabled:opacity-50 ${
               practiceMode === "immersive"
                 ? "bg-indigo-600 text-white"

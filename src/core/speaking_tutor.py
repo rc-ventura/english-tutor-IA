@@ -129,21 +129,50 @@ class SpeakingTutor(BaseTutor):
 
         try:
             _logger.info(f"Sending {len(messages_for_llm)} messages to chat_multimodal.")
-            response = self.tutor_parent.openai_service.chat_multimodal(messages=messages_for_llm, voice="alloy")
+            max_retries = int(os.getenv("AUDIO_RETRY_LIMIT", 3))
+            base_delay = 1.0  # segundos
+            attempts = 0
+            audio_base64_data = None
 
-            bot_text_response = extract_text_from_response(response)
-            audio_base64_data = extract_audio_from_response(response)
+            while attempts < max_retries and not audio_base64_data:
+                try:
+                    response = self.tutor_parent.openai_service.chat_multimodal(
+                        messages=messages_for_llm, voice="alloy"
+                    )
+                    bot_text_response = extract_text_from_response(response)
+                    audio_base64_data = extract_audio_from_response(response)
 
-            if not audio_base64_data:
-                _logger.warning("No audio data in first response. Retrying...")
+                    if not audio_base64_data:
+                        # Verifica se o erro é por limite de tokens
+                        if "context_length_exceeded" in str(response).lower():
+                            _logger.error("Erro: Limite de tokens excedido, não tentará novamente")
+                            break
 
-                response = self.tutor_parent.openai_service.chat_multimodal(messages=messages_for_llm, voice="alloy")
+                        _logger.warning(f"No audio data in response (attempt {attempts+1}/{max_retries})")
+                        # Backoff exponencial
+                        time.sleep(base_delay * (2**attempts))
+                except Exception as e:
+                    _logger.error(f"Erro na tentativa {attempts+1}: {str(e)}")
+                    time.sleep(base_delay * (2**attempts))
 
-                bot_text_response = extract_text_from_response(response)
-                audio_base64_data = extract_audio_from_response(response)
+                attempts += 1
+
+            # --- Fallback to TTS if no audio is returned ---
+            if bot_text_response and not audio_base64_data:
+                _logger.warning("Multimodal response missing audio, falling back to TTS.")
+                try:
+                    # Generate audio from the text response
+                    audio_bytes = self.tutor_parent.openai_service.text_to_speech(bot_text_response)
+                    # The service returns raw bytes, so we need to encode it to base64
+                    audio_base64_data = base64.b64encode(audio_bytes).decode("utf-8")
+                    _logger.info("Successfully generated audio using TTS fallback.")
+                except Exception as e:
+                    _logger.error(f"TTS fallback failed: {e}", exc_info=True)
+                    # If TTS also fails, we proceed with no audio
+                    audio_base64_data = None
 
             if not bot_text_response or not audio_base64_data:
-                _logger.error("Failed to get bot response or audio even after retry.")
+                _logger.error("Failed to get bot response or audio even after retry and TTS fallback.")
 
                 error_msg = "I'm sorry, I couldn't generate a response."
 

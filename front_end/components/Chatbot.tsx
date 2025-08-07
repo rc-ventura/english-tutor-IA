@@ -88,12 +88,42 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
       }
     } else {
       // --- Hybrid Mode Rendering ---
+      // Trata mensagens de áudio primeiro
+      if (isGradioAudioContent(message.content) && message.content.file?.url) {
+        return (
+          <div className="flex items-center gap-2 text-gray-400">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.536 8.464a5 5 0 010 7.072M12 6a7.975 7.975 0 014.242 1.757"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            <span>Mensagem de áudio</span>
+          </div>
+        );
+      }
+
+      // Mantém o tratamento padrão para mensagens de texto
       const text =
         typeof message.content === "string"
           ? message.content
           : message.text_for_llm || "";
       return (
-        <div className="prose prose-invert max-w-3xl whitespace-normal break-words chat-markdown">
+        <div className="max-w-3xl whitespace-normal break-words chat-markdown">
           <ReactMarkdown skipHtml>
             {text.replace(/\n{3,}/g, "\n\n")}
           </ReactMarkdown>
@@ -154,10 +184,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   }, [messages]);
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex-1 overflow-y-auto p-4 pr-6 bg-gray-800"
-    >
+    <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 pr-6">
       <div className="max-w-4xl mx-auto">
         {messages.map((message, index) => (
           <ChatMessageBubble
@@ -175,7 +202,6 @@ const Chatbot: React.FC<ChatbotProps> = ({
             <div className="px-4 py-3 rounded-2xl bg-gray-700 text-gray-200">
               <div className="flex items-center space-x-2">
                 <div className="dot-flashing"></div>
-                <span className="text-sm">Sophia is thinking...</span>
               </div>
             </div>
           </div>

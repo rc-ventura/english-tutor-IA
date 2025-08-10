@@ -126,9 +126,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const handleStartRecording = async () => {
     unlockAudioContext(); // Unlock audio on user gesture
     audioPlayedRef.current = false; // Reset for the new interaction
+    console.info(
+      `[UX] 🎙️ handleStartRecording: start (mode=${practiceMode}, level=${englishLevel})`
+    );
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.debug("[UX] 🎤 getUserMedia acquired");
       setIsRecording(true);
       audioChunksRef.current = [];
       const recorder = new MediaRecorder(stream);
@@ -139,9 +143,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       };
 
       recorder.onstop = async () => {
+        console.info("[UX] ⏹️ recorder.onstop");
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
+        console.debug(
+          `[UX] 💾 audioBlob size=${audioBlob.size}B, chunks=${audioChunksRef.current.length}`
+        );
         const userPlaceholder: ChatMessage = {
           role: "user",
           content: "[Your speech is being processed...]",
@@ -158,6 +166,9 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         };
 
         // Start the streaming job
+        console.info(
+          `[UX] 🚀 start streaming (mode=${practiceMode}, level=${englishLevel})`
+        );
         streamingJobRef.current = api.handleTranscriptionAndResponse(
           audioBlob,
           englishLevel,
@@ -165,13 +176,19 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           (data) => {
             // onData callback
             const { messages, audioUrl } = data;
-            console.log("🟢 onData callback: audioUrl=", audioUrl);
+            console.debug(
+              `[UX] 🟢 onData: messages=${messages.length}, audioUrl=${Boolean(
+                audioUrl
+              )}`
+            );
             if (audioUrl && !audioPlayedRef.current) {
+              console.info("[UX] 🔊 playAudio invoked");
               playAudio(audioUrl);
               audioPlayedRef.current = true;
             }
             setMessages(messages);
             setIsLoading(false);
+            console.debug("[UX] ✅ onData applied to UI");
           },
           handleError // onError callback
         );
@@ -186,6 +203,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   };
 
   const handleToggleRecording = () => {
+    console.debug(`[UX] ⏯️ handleToggleRecording (isRecording=${isRecording})`);
     if (isRecording) {
       handleStopRecording();
     } else {

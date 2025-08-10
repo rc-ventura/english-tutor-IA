@@ -54,15 +54,75 @@ def extract_text_from_response(response: Any) -> str:
 
 
 def extract_audio_from_response(response: Any) -> str | None:
-    """Extrai o áudio em base64 da resposta da OpenAI."""
+    """Extrai o áudio em base64 da resposta da OpenAI.
+    Suporta estruturas antigas (message.audio.data) e novas (content parts com type=output_audio/audio).
+    """
     if not hasattr(response, "choices") or not response.choices:
         return None
 
     message = response.choices[0].message
-    if hasattr(message, "audio") and hasattr(message.audio, "data") and message.audio.data:
-        return message.audio.data
 
+    # 1) Forma antiga: message.audio.data
+    try:
+        if hasattr(message, "audio") and message.audio is not None:
+            data = getattr(message.audio, "data", None)
+            if data:
+                return data
+    except Exception:
+        pass
+
+    # 2) Forma nova: content como lista de partes (ex.: type="output_audio" ou "audio")
+    try:
+        content = getattr(message, "content", None)
+        # content pode ser string (texto puro) ou lista de partes
+        if isinstance(content, list):
+            for part in content:
+                # Suporta acesso tanto por atributo quanto por dict
+                p_type = getattr(part, "type", None) or (isinstance(part, dict) and part.get("type"))
+                if p_type in ("output_audio", "audio"):
+                    audio_obj = getattr(part, "audio", None) or (isinstance(part, dict) and part.get("audio"))
+                    if audio_obj:
+                        # Tente extrair o base64 (data)
+                        data = getattr(audio_obj, "data", None) or (
+                            isinstance(audio_obj, dict) and audio_obj.get("data")
+                        )
+                        if data:
+                            return data
+                        # Alguns formatos podem expor "id"/"url" ao invés de data; log para diagnóstico
+                        url = getattr(audio_obj, "url", None) or (isinstance(audio_obj, dict) and audio_obj.get("url"))
+                        if url:
+                            _logger.info("Audio part has URL instead of inline data (url=%s)", url)
+    except Exception as e:
+        _logger.debug("Failed to parse content parts for audio: %s", e)
+
+    # 3) Sem áudio encontrado: diagnóstico detalhado
     _logger.warning("No audio data found in the response.")
+    try:
+        resp_type = type(response).__name__
+        # Captura tipos das partes de conteúdo, se existirem
+        content_types = None
+        try:
+            c = getattr(response.choices[0].message, "content", None)
+            if isinstance(c, list):
+
+                def part_desc(p: Any) -> str:
+                    t = getattr(p, "type", None) or (isinstance(p, dict) and p.get("type"))
+                    has_audio = hasattr(p, "audio") or (isinstance(p, dict) and ("audio" in p))
+                    return f"type={t},has_audio={has_audio}"
+
+                content_types = [part_desc(p) for p in c]
+        except Exception:
+            content_types = None
+
+        has_msg_audio_attr = hasattr(message, "audio") and getattr(message, "audio") is not None
+        _logger.info(
+            "Audio missing - response shape: type=%s has_msg_audio_attr=%s content_parts=%s",
+            resp_type,
+            has_msg_audio_attr,
+            content_types,
+        )
+    except Exception as e:
+        _logger.info("Audio missing - failed to inspect response shape: %s", e)
     return None
 
 

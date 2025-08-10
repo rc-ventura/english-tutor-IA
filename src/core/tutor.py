@@ -116,7 +116,7 @@ def main():
         tutor = EnglishTutor()
         tutor.launch_ui()
     except Exception as e:
-        logging.basicConfig(level=logging.ERROR)
+        logging.basicConfig(level=logging.INFO)
         logging.error(f"Application startup error: {e}", exc_info=True)
 
 

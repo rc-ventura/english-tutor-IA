@@ -127,19 +127,83 @@ class SpeakingTutor(BaseTutor):
 
         messages_for_llm = [{"role": "system", "content": system_prompt}] + messages_for_llm
 
+        # Prune history to avoid context overflow (system prompt + last N messages)
+        max_hist = int(os.getenv("SPEAKING_MAX_HISTORY", "12"))
+        if len(messages_for_llm) > max_hist + 1:
+            messages_for_llm = [messages_for_llm[0]] + messages_for_llm[-max_hist:]
+        total_chars = sum(len(str(m.get("content", ""))) for m in messages_for_llm)
+        _logger.info(f"LLM payload pruned to {len(messages_for_llm)} msgs, ~{total_chars} chars.")
+
+        # Inject running summary if available to maintain long-term context
+        running_summary = getattr(self, "_running_summary", "")
+        if running_summary:
+            summary_msg = (
+                "Conversation summary so far (for continuity; do not repeat details, use as context only):\n"
+                + running_summary
+            )
+            messages_for_llm = [{"role": "system", "content": summary_msg}] + messages_for_llm
+            _logger.info("Summary injected: True, summary_len=%d", len(running_summary))
+        else:
+            _logger.info("Summary injected: False, summary_len=0")
+
+        # Helper to update running summary (LLM-based with truncation fallback)
+        def _update_running_summary(last_user_text: str, bot_text: str) -> None:
+            max_chars = int(os.getenv("SPEAKING_SUMMARY_MAX_CHARS", "1200"))
+            prev = getattr(self, "_running_summary", "")
+            try:
+                prompt = (
+                    "Update the running summary of a tutoring session.\n"
+                    "Keep key facts, goals, corrections, and user preferences. Be concise (<= 120 words).\n\n"
+                    f"Current summary:\n{prev}\n\n"
+                    "Last exchange:\n"
+                    f"User: {last_user_text}\n"
+                    f"Tutor: {bot_text}\n\n"
+                    "Return only the updated summary."
+                )
+                messages = [
+                    {"role": "system", "content": "You are a concise note taker for an English tutoring session."},
+                    {"role": "user", "content": prompt},
+                ]
+                chunks = self.tutor_parent.openai_service.stream_chat_completion(
+                    messages=messages, temperature=0.2, max_tokens=200
+                )
+                updated = "".join(chunks).strip()
+                if updated:
+                    self._running_summary = updated[:max_chars]
+                    _logger.info("Running summary updated via LLM, new_len=%d", len(self._running_summary))
+                    return
+            except Exception as e:
+                _logger.debug(f"LLM summary update failed, falling back to truncation: {e}")
+            combined = (prev + " " + last_user_text + " " + bot_text).strip()
+            self._running_summary = combined[-max_chars:]
+            _logger.info("Running summary updated via truncation, new_len=%d", len(self._running_summary))
+
+        # Ensure variable is defined even if multimodal call raises repeatedly
+        bot_text_response: str = ""
+
         try:
-            _logger.info(f"Sending {len(messages_for_llm)} messages to chat_multimodal.")
-            max_retries = int(os.getenv("AUDIO_RETRY_LIMIT", 3))
-            base_delay = 1.0  # segundos
+            # Retry policy: default to 1 attempt, configurable via env
+            max_retries = int(os.getenv("AUDIO_RETRY_LIMIT", "1"))
+            # Backoff base delay in milliseconds (0 = no backoff)
+            base_delay_ms = int(os.getenv("AUDIO_RETRY_BACKOFF_MS", "0"))
+            base_delay = max(0.0, base_delay_ms / 1000.0)
             attempts = 0
             audio_base64_data = None
+
+            # Per-mode max_tokens configuration
+            default_max_tokens = int(os.getenv("SPEAKING_MAX_TOKENS_DEFAULT", "700"))
+            hybrid_max = int(os.getenv("SPEAKING_MAX_TOKENS_HYBRID", str(default_max_tokens)))
+            immersive_max = int(os.getenv("SPEAKING_MAX_TOKENS_IMMERSIVE", str(default_max_tokens)))
+            max_tokens = immersive_max if speaking_mode == "Immersive" else hybrid_max
+            _logger.info(f"Using max_tokens={max_tokens} for mode={speaking_mode or 'hybrid'}")
 
             while attempts < max_retries and not audio_base64_data:
                 try:
                     response = self.tutor_parent.openai_service.chat_multimodal(
-                        messages=messages_for_llm, voice="alloy"
+                        messages=messages_for_llm, voice="alloy", max_tokens=max_tokens
                     )
                     bot_text_response = extract_text_from_response(response)
+                    _logger.info(f"LLM text length: {len(bot_text_response)} chars")
                     audio_base64_data = extract_audio_from_response(response)
 
                     if not audio_base64_data:
@@ -148,21 +212,68 @@ class SpeakingTutor(BaseTutor):
                             _logger.error("Erro: Limite de tokens excedido, não tentará novamente")
                             break
 
+                        # Local diagnostics (in addition to utils.audio)
+                        try:
+                            resp_type = type(response).__name__
+                            has_choices = hasattr(response, "choices") and bool(response.choices)
+                            has_audio_attr = False
+                            if has_choices:
+                                msg = response.choices[0].message
+                                has_audio_attr = hasattr(msg, "audio") and getattr(msg, "audio") is not None
+                            _logger.info(
+                                "Diag(no-audio): resp_type=%s has_choices=%s has_audio_attr=%s",
+                                resp_type,
+                                has_choices,
+                                has_audio_attr,
+                            )
+                        except Exception as diag_e:
+                            _logger.info("Diag(no-audio): failed to introspect response: %s", diag_e)
+
                         _logger.warning(f"No audio data in response (attempt {attempts+1}/{max_retries})")
-                        # Backoff exponencial
-                        time.sleep(base_delay * (2**attempts))
+                        # Backoff exponencial (condicional)
+                        delay = base_delay * (2**attempts)
+                        if delay > 0:
+                            time.sleep(delay)
                 except Exception as e:
-                    _logger.error(f"Erro na tentativa {attempts+1}: {str(e)}")
-                    time.sleep(base_delay * (2**attempts))
+                    _logger.error(
+                        "Erro na tentativa %d: %s (%s)",
+                        attempts + 1,
+                        str(e),
+                        type(e).__name__,
+                    )
+                    # If context length exceeded, do not keep retrying the same payload
+                    if "context_length" in str(e).lower() or "maximum context length" in str(e).lower():
+                        _logger.error("Context length exceeded. Will not retry further with same payload.")
+                        break
+                    delay = base_delay * (2**attempts)
+                    if delay > 0:
+                        time.sleep(delay)
 
                 attempts += 1
+
+            # If multimodal did not yield text at all, try text-only fallback
+            if not bot_text_response:
+                _logger.warning("Multimodal returned no text; attempting text-only fallback.")
+                try:
+                    chunks = self.tutor_parent.openai_service.stream_chat_completion(
+                        messages=messages_for_llm, temperature=0.6, max_tokens=max_tokens
+                    )
+                    bot_text_response = "".join(chunks).strip()
+                    _logger.info("Text-only fallback produced %d chars.", len(bot_text_response))
+                except Exception as e:
+                    _logger.error("Text-only fallback failed: %s", e, exc_info=True)
 
             # --- Fallback to TTS if no audio is returned ---
             if bot_text_response and not audio_base64_data:
                 _logger.warning("Multimodal response missing audio, falling back to TTS.")
                 try:
-                    # Generate audio from the text response
-                    audio_bytes = self.tutor_parent.openai_service.text_to_speech(bot_text_response)
+                    # Generate audio from the text response (with safety cap)
+                    tts_text = bot_text_response
+                    max_tts_chars = int(os.getenv("TTS_MAX_CHARS", "1200"))
+                    if len(tts_text) > max_tts_chars:
+                        _logger.info(f"TTS input too long ({len(tts_text)} chars). Truncating to {max_tts_chars}.")
+                        tts_text = tts_text[:max_tts_chars] + "..."
+                    audio_bytes = self.tutor_parent.openai_service.text_to_speech(tts_text)
                     # The service returns raw bytes, so we need to encode it to base64
                     audio_base64_data = base64.b64encode(audio_bytes).decode("utf-8")
                     _logger.info("Successfully generated audio using TTS fallback.")
@@ -171,13 +282,18 @@ class SpeakingTutor(BaseTutor):
                     # If TTS also fails, we proceed with no audio
                     audio_base64_data = None
 
-            if not bot_text_response or not audio_base64_data:
-                _logger.error("Failed to get bot response or audio even after retry and TTS fallback.")
+            # If we have text but no audio, send text-only fallback so the chat still updates
+            if bot_text_response and not audio_base64_data:
+                _logger.warning("Audio unavailable; sending text-only fallback message.")
+                current_history.append({"role": "assistant", "content": bot_text_response})
+                yield current_history, current_history, None
+                return
 
+            # If we don't have text either, surface an error message
+            if not bot_text_response:
+                _logger.error("Failed to get bot response text even after retries and TTS fallback.")
                 error_msg = "I'm sorry, I couldn't generate a response."
-
                 current_history.append({"role": "assistant", "content": error_msg})
-
                 yield current_history, current_history, None
                 return
 

@@ -8,9 +8,14 @@ from openai import OpenAI, AuthenticationError
 from pydub import AudioSegment
 from openai.types.chat import ChatCompletion
 
-# --- Constants for Model Names ---
-MULTIMODAL_MODEL = "gpt-4o-mini-audio-preview"
-TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe"
+# --- Constants for Model Names (configurable via env) ---
+MULTIMODAL_MODEL = os.getenv("MULTIMODAL_MODEL", "gpt-4o-mini-audio-preview")
+TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
+FALLBACK_TRANSCRIPTION_MODEL = os.getenv("FALLBACK_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
+
+logging.info(
+    f"Using models: MULTIMODAL_MODEL={MULTIMODAL_MODEL}, TRANSCRIPTION_MODEL={TRANSCRIPTION_MODEL}, FALLBACK_TRANSCRIPTION_MODEL={FALLBACK_TRANSCRIPTION_MODEL}"
+)
 
 
 class OpenAIService:
@@ -131,18 +136,47 @@ class OpenAIService:
             audio.export(converted_wav_path, format="wav")
             logging.info(f"Successfully converted audio to WAV: {converted_wav_path}")
 
+            # Basic integrity check on the converted file
+            try:
+                size_bytes = os.path.getsize(converted_wav_path)
+                logging.info(f"Converted WAV size: {size_bytes} bytes")
+                if size_bytes < 1024:  # < 1KB usually indicates empty/invalid file
+                    raise ValueError("Converted WAV appears too small; possible empty/invalid recording.")
+            except Exception as size_err:
+                logging.error(f"Converted WAV size check failed: {size_err}")
+                raise
+
             # Transcribe the converted WAV file
-            with open(converted_wav_path, "rb") as audio_file:
-                transcription = self.client.audio.transcriptions.create(
-                    model=TRANSCRIPTION_MODEL,
-                    file=audio_file,
-                    language="en",
-                    response_format="text",
-                    prompt=TRANSCRIBE_PROMPT,
-                )
+            def _do_transcribe(model_name: str) -> str:
+                logging.info(f"Transcribing with model: {model_name}")
+                with open(converted_wav_path, "rb") as audio_file:
+                    resp = self.client.audio.transcriptions.create(
+                        model=model_name,
+                        file=audio_file,
+                        language="en",
+                        # Avoid response_format="text" to prevent JSON parse errors in SDK
+                        prompt=TRANSCRIBE_PROMPT,
+                    )
+                # The SDK returns an object with .text
+                if hasattr(resp, "text") and isinstance(resp.text, str):
+                    return resp.text
+                # Some SDKs might return the raw string
+                if isinstance(resp, str):
+                    return resp
+                # Last resort, try to get any plausible text field
+                if hasattr(resp, "output_text"):
+                    return getattr(resp, "output_text")
+                raise ValueError("Unexpected transcription response type; no text found.")
+
+            try:
+                text = _do_transcribe(TRANSCRIPTION_MODEL)
+            except Exception as primary_err:
+                logging.error(f"Primary transcription failed ({TRANSCRIPTION_MODEL}): {primary_err}", exc_info=True)
+                logging.info(f"Falling back to {FALLBACK_TRANSCRIPTION_MODEL}...")
+                text = _do_transcribe(FALLBACK_TRANSCRIPTION_MODEL)
 
             logging.info("Audio transcribed successfully.")
-            return transcription if isinstance(transcription, str) else transcription.text
+            return text
 
         except Exception as e:
             logging.error(f"Error during audio conversion or transcription: {e}", exc_info=True)

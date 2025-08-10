@@ -21,19 +21,6 @@ const App: React.FC = () => {
     setIsLoggedIn(true);
   };
 
-  const renderActiveTab = () => {
-    switch (activeTab) {
-      case "speaking":
-        return <SpeakingTab englishLevel={englishLevel} />;
-      case "writing":
-        return <WritingTab englishLevel={englishLevel} />;
-      case "progress":
-        return <ProgressTab />;
-      default:
-        return <SpeakingTab englishLevel={englishLevel} />;
-    }
-  };
-
   if (!isLoggedIn) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
@@ -58,7 +45,15 @@ const App: React.FC = () => {
               !isClientReady ? "blur-md pointer-events-none" : ""
             }`}
           >
-            {renderActiveTab()}
+            <div className={activeTab === "speaking" ? "h-full" : "hidden"}>
+              <SpeakingTab englishLevel={englishLevel} />
+            </div>
+            <div className={activeTab === "writing" ? "h-full" : "hidden"}>
+              <WritingTab englishLevel={englishLevel} />
+            </div>
+            <div className={activeTab === "progress" ? "h-full" : "hidden"}>
+              <ProgressTab />
+            </div>
           </div>
           {!isClientReady && (
             <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-lg">

@@ -35,16 +35,16 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const streamingJobRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    // Initialize the AudioContext for audio playback
-    audioContextRef.current = new (window.AudioContext ||
-      window.webkitAudioContext)();
+    // Escolhe o construtor disponível e tipa para satisfazer o TS
+    const AudioContextCtor = (window.AudioContext ??
+      (window as any).webkitAudioContext) as {
+      new (): AudioContext;
+    };
+    audioContextRef.current = new AudioContextCtor();
 
     return () => {
-      // Clean up resources when the component unmounts
       audioContextRef.current?.close();
-      if (streamingJobRef.current) {
-        streamingJobRef.current(); // Cancel any ongoing streaming job
-      }
+      if (streamingJobRef.current) streamingJobRef.current();
     };
   }, []);
 

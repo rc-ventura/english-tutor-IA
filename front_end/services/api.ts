@@ -20,7 +20,11 @@ const getClient = () => clientPromise;
 
 const formatMessages = (rawMessages: any[]): ChatMessage[] =>
   Array.isArray(rawMessages)
-    ? rawMessages.map((m) => ({ role: m.role, content: m.content }))
+    ? rawMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        text_for_llm: (m as any).text_for_llm,
+      }))
     : [];
 
 type FileLike = GradioFile | string | null | undefined;
@@ -57,18 +61,29 @@ export const handleTranscriptionAndResponse = (
   onData: (data: { messages: ChatMessage[]; audioUrl: string | null }) => void,
   onError: (error: Error) => void
 ) => {
-  let job: ReturnType<Client['submit']>;
+  let job: ReturnType<Client["submit"]>;
 
   const process = async () => {
     try {
       const client = await getClient();
 
       // Step 1: Await the transcription using predict(), as it's a single event.
-      await client.predict("/speaking_transcribe", {
+      const tx = await client.predict("/speaking_transcribe", {
         audio_filepath: await handle_file(audioBlob),
         level,
         speaking_mode: practiceMode === "hybrid" ? "Hybrid" : "Immersive",
       });
+
+      // After transcription completes, immediately reflect the user's message in the UI
+      try {
+        const [rawMessages] = tx.data as [any[], any[]];
+        onData({ messages: formatMessages(rawMessages), audioUrl: null });
+      } catch (e) {
+        console.warn(
+          "Unexpected /speaking_transcribe payload; skipping immediate UI update",
+          e
+        );
+      }
 
       // Step 2: Once transcription is done, submit the job to stream the bot's response.
       job = client.submit("/speaking_bot_response", {
@@ -119,7 +134,7 @@ export const generateRandomTopicStream = (
   onData: (messages: ChatMessage[]) => void,
   onError: (error: Error) => void
 ) => {
-  let job: ReturnType<Client['submit']>;
+  let job: ReturnType<Client["submit"]>;
   const process = async () => {
     try {
       const client = await getClient();
@@ -174,7 +189,7 @@ export const processInputStream = (
   onData: (messages: ChatMessage[]) => void,
   onError: (error: Error) => void
 ) => {
-  let job: ReturnType<Client['submit']>;
+  let job: ReturnType<Client["submit"]>;
   const process = async () => {
     try {
       const client = await getClient();

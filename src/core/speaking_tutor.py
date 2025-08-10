@@ -178,6 +178,13 @@ class SpeakingTutor(BaseTutor):
             self._running_summary = combined[-max_chars:]
             _logger.info("Running summary updated via truncation, new_len=%d", len(self._running_summary))
 
+        # Helper to extract the latest user text (prefer text_for_llm)
+        def _get_last_user_text() -> str:
+            for m in reversed(current_history):
+                if m.get("role") == "user":
+                    return m.get("text_for_llm") or m.get("content") or ""
+            return ""
+
         # Ensure variable is defined even if multimodal call raises repeatedly
         bot_text_response: str = ""
 
@@ -286,6 +293,10 @@ class SpeakingTutor(BaseTutor):
             if bot_text_response and not audio_base64_data:
                 _logger.warning("Audio unavailable; sending text-only fallback message.")
                 current_history.append({"role": "assistant", "content": bot_text_response})
+                try:
+                    _update_running_summary(_get_last_user_text(), bot_text_response)
+                except Exception as e:
+                    _logger.debug("Summary update skipped (text-only): %s", e)
                 yield current_history, current_history, None
                 return
 
@@ -310,6 +321,10 @@ class SpeakingTutor(BaseTutor):
                     "text_for_llm": bot_text_response,
                 }
                 current_history.append(bot_message)
+                try:
+                    _update_running_summary(_get_last_user_text(), bot_text_response)
+                except Exception as e:
+                    _logger.debug("Summary update skipped (immersive): %s", e)
                 yield current_history, current_history, audio_path
                 return
 
@@ -341,6 +356,12 @@ class SpeakingTutor(BaseTutor):
 
                 # Control the streaming speed for a natural feel
                 time.sleep(0.05)
+
+            # After finishing streaming, update the running summary
+            try:
+                _update_running_summary(_get_last_user_text(), bot_text_response)
+            except Exception as e:
+                _logger.debug("Summary update skipped (hybrid): %s", e)
 
         except Exception as e:
             _logger.error(f"Error calling chat_multimodal: {e}", exc_info=True)

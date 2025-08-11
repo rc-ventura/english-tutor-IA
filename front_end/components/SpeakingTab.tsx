@@ -150,11 +150,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         console.debug(
           `[UX] 💾 audioBlob size=${audioBlob.size}B, chunks=${audioChunksRef.current.length}`
         );
-        const userPlaceholder: ChatMessage = {
-          role: "user",
-          content: "[Your speech is being processed...]",
+        const userPlaceholder: ChatMessage = { role: "user", content: null };
+        const botPlaceholder: ChatMessage = {
+          role: "assistant",
+          content: null,
         };
-        setMessages((prev) => [...prev, userPlaceholder]);
+        // Show both bubbles immediately with loading placeholders; onData will replace them with real content
+        setMessages((prev) => [...prev, userPlaceholder, botPlaceholder]);
 
         const handleError = (error: Error) => {
           console.error("Streaming Error:", error);
@@ -175,20 +177,33 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           practiceMode,
           (data) => {
             // onData callback
-            const { messages, audioUrl } = data;
+            const { messages: serverMessages, audioUrl } = data;
             console.debug(
-              `[UX] 🟢 onData: messages=${messages.length}, audioUrl=${Boolean(
-                audioUrl
-              )}`
+              `[UX] 🟢 onData: messages=${
+                serverMessages.length
+              }, audioUrl=${Boolean(audioUrl)}`
             );
             if (audioUrl && !audioPlayedRef.current) {
               console.info("[UX] 🔊 playAudio invoked");
               playAudio(audioUrl);
               audioPlayedRef.current = true;
             }
-            setMessages(messages);
+
+            // Preserve assistant presence while audio plays but avoid duplicates
+            let merged = serverMessages as ChatMessage[];
+            const assistantPendingExists = merged.some(
+              (m) =>
+                m.role === "assistant" &&
+                (m.content == null ||
+                  (typeof m.content !== "string" && !(m as any).text_for_llm))
+            );
+            if (!assistantPendingExists && (audioUrl || isLoading)) {
+              merged = [...merged, { role: "assistant", content: null }];
+            }
+
+            setMessages(merged);
             setIsLoading(false);
-            console.debug("[UX] ✅ onData applied to UI");
+            console.debug("[UX] ✅ onData applied to UI (merged)");
           },
           handleError // onError callback
         );
@@ -268,7 +283,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         </fieldset>
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-4">
+      <div className="flex-1 min-h-0 overflow-hidden pr-4">
         <Chatbot
           messages={messages}
           isLoading={isLoading}

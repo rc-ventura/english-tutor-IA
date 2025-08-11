@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { ChatMessage } from "../types";
 import { UserIcon, BrainCircuitIcon, CopyIcon } from "./icons/Icons";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 // --- Local Type Definitions for Clarity ---
 interface GradioFile {
@@ -66,6 +67,22 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     }
   };
 
+  // // Normalize assistant text to improve readability when the model returns a single long paragraph
+  // function normalizeAssistantText(text: string): string {
+  //   if (!text) return "";
+  //   let t = text;
+  //   // Insert blank lines before common section headers (EN/PT): Day(s) X or X–Y
+  //   t = t.replace(
+  //     /\s+(?=(?:Days?|Day|Dias?|Dia)\s\d+(?:[–-]\d+)?\s*:)/g,
+  //     "\n\n"
+  //   );
+  //   // Ensure bullet items render as a list when the dash appears mid-paragraph
+  //   t = t.replace(/\s-\s/g, "\n- ");
+  //   // Collapse 3+ newlines to 2 for clean Markdown
+  //   t = t.replace(/\n{3,}/g, "\n\n");
+  //   return t.trim();
+  // }
+
   const renderContent = () => {
     if (practiceMode === "immersive") {
       // --- Immersive Mode Rendering ---
@@ -80,11 +97,22 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           </div>
         );
       } else {
-        // Placeholder for user or assistant while processing
-        const placeholder = isUser
-          ? "⏳ Processando sua fala..."
-          : "⏳ Gerando resposta...";
-        return <div style={{ color: "#aaa" }}>{placeholder}</div>;
+        // Inline modern placeholder inside the bubble
+        return (
+          <div className="flex items-center gap-2 text-gray-300">
+            <div className="eq-bars" aria-hidden>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <span>
+              {isUser
+                ? "Transcrevendo sua fala..."
+                : "Gerando resposta de voz..."}
+            </span>
+          </div>
+        );
       }
     } else {
       // --- Hybrid Mode Rendering ---
@@ -117,15 +145,31 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         );
       }
 
+      // Se ainda não há conteúdo de texto (pendente), mostrar placeholder moderno
+      if (typeof message.content !== "string" && !message.text_for_llm) {
+        return (
+          <div className="flex items-center gap-2 text-gray-300">
+            <div className="eq-bars" aria-hidden>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <span>{isUser ? "Enviando..." : "Aguardando..."}</span>
+          </div>
+        );
+      }
+
       // Mantém o tratamento padrão para mensagens de texto
       const text =
         typeof message.content === "string"
           ? message.content
           : message.text_for_llm || "";
+      //const normalized = normalizeAssistantText(text);
       return (
-        <div className="max-w-3xl whitespace-normal break-words chat-markdown">
-          <ReactMarkdown skipHtml>
-            {text.replace(/\n{3,}/g, "\n\n")}
+        <div className="max-w-3xl whitespace-pre-wrap break-words leading-relaxed chat-markdown">
+          <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>
+            {text}
           </ReactMarkdown>
         </div>
       );
@@ -170,21 +214,70 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   );
 };
 
+// Compact typing bubble used for global loading state
+const TypingBubble: React.FC<{
+  variant?: "thinking" | "audio" | "transcribing";
+}> = ({ variant = "thinking" }) => {
+  const label =
+    variant === "audio"
+      ? "Gerando resposta de voz..."
+      : variant === "transcribing"
+      ? "Transcrevendo sua fala..."
+      : "Gerando resposta...";
+  return (
+    <div className="flex justify-start items-center gap-3 my-4">
+      <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
+        <BrainCircuitIcon className="w-6 h-6 text-white" />
+      </div>
+      <div className="px-4 py-3 rounded-2xl bg-gray-700 text-gray-200">
+        <div className="flex items-center gap-3">
+          <div className="eq-bars" aria-hidden>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <span className="text-sm text-gray-300">{label}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Chatbot: React.FC<ChatbotProps> = ({
   messages,
   isLoading,
   practiceMode,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const [nearBottom, setNearBottom] = useState(true);
 
+  // Detect whether user is near the bottom to avoid fighting manual scroll
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const distance = el.scrollHeight - (el.scrollTop + el.clientHeight);
+      setNearBottom(distance < 64); // 64px threshold
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-scroll only if the user is already near the bottom
+  useEffect(() => {
+    if (nearBottom) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [messages]);
+  }, [messages, isLoading, nearBottom]);
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 pr-6">
+    <div
+      ref={scrollRef}
+      className="relative h-full overflow-y-auto p-4 pr-6 chat-scrollbar"
+    >
       <div className="max-w-4xl mx-auto">
         {messages.map((message, index) => (
           <ChatMessageBubble
@@ -194,17 +287,36 @@ const Chatbot: React.FC<ChatbotProps> = ({
             isLastMessage={index === messages.length - 1}
           />
         ))}
-        {isLoading && (
-          <div className="flex justify-start items-center gap-3 my-4">
-            <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
-              <BrainCircuitIcon className="w-6 h-6 text-white" />
-            </div>
-            <div className="px-4 py-3 rounded-2xl bg-gray-700 text-gray-200">
-              <div className="flex items-center space-x-2">
-                <div className="dot-flashing"></div>
-              </div>
-            </div>
-          </div>
+        {(() => {
+          const hasPendingAssistant = messages.some(
+            (m) =>
+              m.role === "assistant" &&
+              (m.content == null ||
+                (typeof m.content !== "string" && !(m as any).text_for_llm))
+          );
+          return isLoading && !hasPendingAssistant ? (
+            <TypingBubble
+              variant={practiceMode === "immersive" ? "audio" : "thinking"}
+            />
+          ) : null;
+        })()}
+        {/* Anchor at the bottom for smooth auto-scroll */}
+        <div ref={bottomRef} />
+
+        {/* Jump to latest button when user scrolled up */}
+        {!nearBottom && (
+          <button
+            onClick={() =>
+              bottomRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "end",
+              })
+            }
+            aria-label="Jump to latest"
+            className="absolute bottom-4 right-4 px-3.5 py-2.5 rounded-full bg-emerald-500 text-white shadow-xl ring-2 ring-white/40 hover:bg-emerald-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 transition"
+          >
+            Jump to latest
+          </button>
         )}
       </div>
     </div>

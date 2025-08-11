@@ -9,25 +9,69 @@
 .chat-markdown ul {
   list-style-type: disc;
   list-style-position: outside;
-  margin-left: 1.5em;
+  margin-left: 1.25em;
   padding-left: 0;
-  margin-bottom: 2.25em;
+  margin-bottom: 0.8em;
 }
 
 .chat-markdown ol {
   list-style-type: decimal;
   list-style-position: outside;
-  margin-left: 1.5em;
+  margin-left: 1.25em;
   padding-left: 0;
-  margin-bottom: 2.25em;
+  margin-bottom: 0.8em;
 }
 
 .chat-markdown li {
-  margin-bottom: 1.15em;
+  margin-bottom: 0.35em;
 }
 
 .chat-markdown p {
-  margin-bottom: 1em;
+  margin: 0.4em 0;
+}
+
+/* Headings */
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4,
+.chat-markdown h5,
+.chat-markdown h6 {
+  margin-top: 0.6em;
+  margin-bottom: 0.4em;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+/* Code blocks and inline code */
+.chat-markdown pre {
+  background: #111827; /* gray-900 */
+  color: #e5e7eb; /* gray-200 */
+  border-radius: 0.375rem; /* rounded-md */
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+.chat-markdown code {
+  background: #1f2937; /* gray-800 */
+  color: #e5e7eb; /* gray-200 */
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.3rem;
+}
+
+/* Blockquote */
+.chat-markdown blockquote {
+  border-left: 3px solid #4b5563; /* gray-600 */
+  padding-left: 0.75rem;
+  color: #9ca3af; /* gray-400 */
+  margin: 0.8em 0;
+}
+
+/* Horizontal rule */
+.chat-markdown hr {
+  border: none;
+  border-top: 1px solid #374151; /* gray-700 */
+  margin: 1.25em 0;
 }
 
 /* Loading spinner animation */
@@ -81,4 +125,123 @@
     opacity: 0.3;
     transform: translateY(0);
   }
+}
+
+/* Equalizer-style typing indicator */
+.eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 14px;
+}
+.eq-bars span {
+  display: block;
+  width: 3px;
+  height: 12px;
+  background-color: rgba(148, 163, 184, 0.85); /* slate-400 */
+  border-radius: 2px;
+  transform-origin: bottom;
+  animation: eq-scale 1000ms ease-in-out infinite;
+}
+.eq-bars span:nth-child(1) {
+  animation-delay: 0ms;
+}
+.eq-bars span:nth-child(2) {
+  animation-delay: 120ms;
+}
+.eq-bars span:nth-child(3) {
+  animation-delay: 240ms;
+}
+.eq-bars span:nth-child(4) {
+  animation-delay: 360ms;
+}
+
+@keyframes eq-scale {
+  0% {
+    transform: scaleY(0.35);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.85;
+  }
+}
+
+/* Custom scrollbar for chat container */
+.chat-scrollbar {
+  /* Firefox */
+  scrollbar-width: thin; /* reserve space to avoid layout shift */
+  scrollbar-color: transparent transparent; /* hidden by default */
+  /* Prevent layout shift when scrollbar appears */
+  scrollbar-gutter: stable both-edges;
+  /* Smooth momentum scrolling on iOS/macOS */
+  -webkit-overflow-scrolling: touch;
+}
+.chat-scrollbar:hover {
+  /* Show only on hover without changing layout */
+  scrollbar-width: thin;
+  /* Firefox: ultra-light translucent */
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent; /* slate-400 @ 30% */
+}
+/* WebKit */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 12px; /* reserve space at all times */
+  height: 12px;
+}
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  /* Hidden by default but keeps the gutter width reserved */
+  background-color: transparent;
+  border-radius: 9999px; /* pill */
+  border: 5px solid transparent; /* larger padding -> thinner visual thumb (~2px) */
+  background-clip: content-box;
+  /* Smooth fade-in/out */
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+.chat-scrollbar:hover::-webkit-scrollbar-thumb {
+  /* Ultra-light translucent thumb with subtle sheen */
+  background-color: rgba(148, 163, 184, 0.22); /* slate-400 @ 22% */
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.14),
+    rgba(255, 255, 255, 0.04)
+  );
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background-clip: content-box;
+}
+.chat-scrollbar::-webkit-scrollbar-thumb:active {
+  background-color: rgba(148, 163, 184, 0.45); /* slate-400 @ 45% */
+}
+
+/* Firefox: stronger opacity when actively clicking/dragging */
+.chat-scrollbar:active {
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+/* On small screens (touch), keep it hidden (no hover available) */
+@media (max-width: 640px) {
+  .chat-scrollbar {
+    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .chat-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none; /* WebKit */
+  }
+}
+
+/* Optional: fully hide scrollbar (use sparingly; reduces affordance & a11y) */
+.scrollbar-hidden {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* WebKit */
 }

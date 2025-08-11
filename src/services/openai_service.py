@@ -10,8 +10,8 @@ from openai.types.chat import ChatCompletion
 
 # --- Constants for Model Names (configurable via env) ---
 MULTIMODAL_MODEL = os.getenv("MULTIMODAL_MODEL", "gpt-4o-mini-audio-preview")
-TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "whisper-1")
-FALLBACK_TRANSCRIPTION_MODEL = os.getenv("FALLBACK_TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
+TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
+FALLBACK_TRANSCRIPTION_MODEL = os.getenv("FALLBACK_TRANSCRIPTION_MODEL", "Whisper-1")
 
 logging.info(
     f"Using models: MULTIMODAL_MODEL={MULTIMODAL_MODEL}, TRANSCRIPTION_MODEL={TRANSCRIPTION_MODEL}, FALLBACK_TRANSCRIPTION_MODEL={FALLBACK_TRANSCRIPTION_MODEL}"

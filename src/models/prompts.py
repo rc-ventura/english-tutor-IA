@@ -29,6 +29,7 @@ SPEAKING_PROMPT_TEMPLATE = (
     "If the user makes a grammatical mistake, gently correct it or ask a question that helps them self-correct.\n"
     "For example, if they say 'I goed to the store', you might say 'Oh, you went to the store? What did you buy?'"
     "Important: Consider the student's current level {level_description} when you ask questions and answer them."
+    "\n\nFormatting: Always format your responses in Markdown. Use headings for sections and bullet lists for items. Separate sections with blank lines. For itineraries or multi-step plans, use '### Days 1–3: Title' followed by list items starting with '-'. Keep bullets concise (1–2 sentences)."
 )
 
 DEFAULT_PROMPT = (
@@ -48,7 +49,7 @@ TRANSCRIBE_PROMPT = (
 def system_message(mode: str = "speaking", level: Optional[str] = None) -> str:
     """Get the appropriate system message based on tutoring mode."""
     level_description = (
-        f"The student's English level is {level}." if level is None else "The student's English level is not specified."
+        f"The student's English level is {level}." if level else "The student's English level is not specified."
     )
 
     if mode == "writing":

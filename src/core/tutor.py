@@ -106,7 +106,11 @@ class EnglishTutor:
     def launch_ui(self):
         """Run the Gradio interface."""
         app = run_gradio_interface(self)
-        uvicorn.run(app, host="127.0.0.1", port=7901)
+        uvicorn.run(app, host="127.0.0.1", port=7901, log_level="info")
+
+
+# Ensure INFO-level logs are visible for our modules (diagnostics, summary injection/updates)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s:%(message)s", force=True)
 
 
 # module-level function
@@ -116,7 +120,6 @@ def main():
         tutor = EnglishTutor()
         tutor.launch_ui()
     except Exception as e:
-        logging.basicConfig(level=logging.INFO)
         logging.error(f"Application startup error: {e}", exc_info=True)
 
 

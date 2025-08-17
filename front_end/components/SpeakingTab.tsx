@@ -32,6 +32,8 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioPlayedRef = useRef<boolean>(false);
+  const awaitingAssistantRef = useRef<boolean>(false);
+  const [botSpeaking, setBotSpeaking] = useState<boolean>(false);
   const streamingJobRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -101,11 +103,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       // FIX: Add a small delay to prevent audio quality issues on autoplay
       const playTimeout = setTimeout(() => {
         console.log("🔊 Starting audio playback after short delay...");
+        setBotSpeaking(true);
         source.start(0);
       }, 150); // 150ms delay is enough for the browser to settle.
 
       source.onended = () => {
         console.log("🔊 Audio playback finished");
+        setBotSpeaking(false);
       };
     } catch (error) {
       console.error("Error playing audio with Web Audio API:", error);
@@ -157,6 +161,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         };
         // Show both bubbles immediately with loading placeholders; onData will replace them with real content
         setMessages((prev) => [...prev, userPlaceholder, botPlaceholder]);
+        awaitingAssistantRef.current = true;
 
         const handleError = (error: Error) => {
           console.error("Streaming Error:", error);
@@ -189,17 +194,25 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
               audioPlayedRef.current = true;
             }
 
-            // Preserve assistant presence while audio plays but avoid duplicates
+            // Keep assistant placeholder visible across the user transcription update and until assistant text arrives
             let merged = serverMessages as ChatMessage[];
-            const assistantPendingExists = merged.some(
+            const last = merged[merged.length - 1];
+            const lastIsAssistantPending =
+              !!last &&
+              last.role === "assistant" &&
+              (last.content == null || (typeof last.content !== "string" && !(last as any).text_for_llm));
+            const hasAssistantText = merged.some(
               (m) =>
                 m.role === "assistant" &&
-                (m.content == null ||
-                  (typeof m.content !== "string" && !(m as any).text_for_llm))
+                (typeof m.content === "string" || (m as any).text_for_llm)
             );
-            if (!assistantPendingExists && (audioUrl || isLoading)) {
+            const needsAssistantPlaceholder =
+              awaitingAssistantRef.current || !!audioUrl || isLoading || botSpeaking;
+            if (needsAssistantPlaceholder && !lastIsAssistantPending) {
               merged = [...merged, { role: "assistant", content: null }];
             }
+            // Stop awaiting only once assistant textual content appears
+            awaitingAssistantRef.current = !hasAssistantText;
 
             setMessages(merged);
             setIsLoading(false);
@@ -288,6 +301,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           messages={messages}
           isLoading={isLoading}
           practiceMode={practiceMode}
+          botIsSpeaking={botSpeaking}
         />
       </div>
 

@@ -18,12 +18,14 @@ interface ChatbotProps {
   messages: ChatMessage[];
   isLoading: boolean;
   practiceMode: "hybrid" | "immersive";
+  botIsSpeaking?: boolean;
 }
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
   practiceMode: "hybrid" | "immersive";
   isLastMessage: boolean;
+  botIsSpeaking?: boolean;
 }
 
 // --- Helper Functions ---
@@ -54,6 +56,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   message,
   practiceMode,
   isLastMessage,
+  botIsSpeaking,
 }) => {
   const isUser = message.role === "user";
 
@@ -109,6 +112,8 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
             <span>
               {isUser
                 ? "Transcrevendo sua fala..."
+                : botIsSpeaking
+                ? "Falando..."
                 : "Gerando resposta de voz..."}
             </span>
           </div>
@@ -155,7 +160,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
               <span></span>
               <span></span>
             </div>
-            <span>{isUser ? "Enviando..." : "Aguardando..."}</span>
+            <span>{isUser ? "Enviando..." : botIsSpeaking ? "Falando..." : "Aguardando..."}</span>
           </div>
         );
       }
@@ -248,6 +253,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   messages,
   isLoading,
   practiceMode,
+  botIsSpeaking,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -285,6 +291,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
             message={message}
             practiceMode={practiceMode}
             isLastMessage={index === messages.length - 1}
+            botIsSpeaking={botIsSpeaking}
           />
         ))}
         {(() => {

@@ -1,15 +1,15 @@
 import gradio as gr
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+import os
 from gradio.routes import mount_gradio_app
 from fastapi.middleware.cors import CORSMiddleware
-
-
-from typing import TYPE_CHECKING
-
-import gradio as gr
+from typing import TYPE_CHECKING, Optional, Dict, Any
+from src.core.escalation_manager import EscalationManager
 
 if TYPE_CHECKING:
+    # Type-only import to avoid circular import at runtime
     from src.core.tutor import EnglishTutor
 
 
@@ -234,7 +234,7 @@ def run_gradio_interface(tutor: "EnglishTutor"):
 
     # Mount the Gradio app onto a FastAPI app
     app = FastAPI()
-    app = mount_gradio_app(app, demo, path="/")
+    app = mount_gradio_app(app, demo, path="/gradio")
 
     # Add the CORS middleware to the FastAPI app
     app.add_middleware(
@@ -244,4 +244,64 @@ def run_gradio_interface(tutor: "EnglishTutor"):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ------------------- Escalation API (FastAPI) -------------------
+    escalation_manager = EscalationManager()
+
+    @app.post("/api/escalations")
+    async def create_escalation(payload: Dict[str, Any]):
+        try:
+            return escalation_manager.create(payload)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.get("/api/escalations")
+    async def list_escalations(status: Optional[str] = None):
+        return escalation_manager.list(status)
+
+    @app.post("/api/escalations/{escalation_id}/resolve")
+    async def resolve_escalation(escalation_id: str, body: Optional[Dict[str, Any]] = None):
+        note = (body or {}).get("resolution_note")
+        try:
+            return escalation_manager.resolve(escalation_id, note)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.get("/api/escalations/{escalation_id}")
+    async def get_escalation(escalation_id: str):
+        rec = escalation_manager.get(escalation_id)
+        if not rec:
+            raise HTTPException(status_code=404, detail="Escalation not found")
+        return rec
+
+    @app.get("/api/escalations/{escalation_id}/audio")
+    async def get_escalation_audio(escalation_id: str):
+        rec = escalation_manager.get(escalation_id)
+        if not rec:
+            raise HTTPException(status_code=404, detail="Escalation not found")
+
+        # Prefer persisted copy
+        audio_path = rec.get("audio_relpath")
+        # If not present, try to resolve from original URL
+        if not audio_path:
+            url = rec.get("audio_url_at_submit")
+            if url:
+                audio_path = escalation_manager._parse_local_path_from_url(url)  # type: ignore[attr-defined]
+
+        if not audio_path or not os.path.exists(audio_path):
+            raise HTTPException(status_code=404, detail="Audio file not available")
+
+        # Best-effort media type
+        ext = os.path.splitext(audio_path)[1].lower()
+        media = {
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+            ".m4a": "audio/mp4",
+            ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
+        }.get(ext, "application/octet-stream")
+        return FileResponse(audio_path, media_type=media)
+
     return app

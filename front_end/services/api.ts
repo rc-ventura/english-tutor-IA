@@ -8,10 +8,14 @@ import type {
   GradioAudioPlaybackPayload,
 } from "./gradio";
 
-const BASE_URL = import.meta.env.VITE_GRADIO_BASE_URL;
+// Distinguish Gradio base (mounted under /gradio) from REST API base (root)
+const GRADIO_BASE_URL = import.meta.env.VITE_GRADIO_BASE_URL as string;
+const API_BASE_URL: string =
+  (import.meta.env.VITE_API_BASE_URL as string) ||
+  (GRADIO_BASE_URL?.replace(/\/?gradio\/?$/, "") || "");
 
-// Conecta ao cliente Gradio usando o endpoint correto
-const clientPromise = Client.connect(BASE_URL).catch((error) => {
+// Conecta ao cliente Gradio usando o endpoint correto (/gradio)
+const clientPromise = Client.connect(GRADIO_BASE_URL).catch((error) => {
   console.error("Falha ao conectar ao Gradio API:", error);
   return Promise.reject(error);
 });
@@ -38,11 +42,11 @@ const getFileUrl = (file: FileLike): string | null => {
     if (file.startsWith("http://") || file.startsWith("https://")) {
       return file;
     }
-    return `${BASE_URL}/file=${file}`;
+    return `${GRADIO_BASE_URL}/file=${file}`;
   }
 
   // If backend sends structured object
-  return file.url ?? (file.path ? `${BASE_URL}/file=${file.path}` : null);
+  return file.url ?? (file.path ? `${GRADIO_BASE_URL}/file=${file.path}` : null);
 };
 
 // SET API KEY
@@ -259,4 +263,101 @@ export const getProgressHtml = async (): Promise<string> => {
     (response.data as GradioProgressPayload)[0] ??
     '<p class="text-gray-400">No progress data available.</p>'
   );
+};
+
+// ---------- Escalation API ----------
+export interface Escalation {
+  id: string;
+  created_at: string;
+  status: "queued" | "resolved";
+  source?: "speaking" | "writing" | null;
+  practice_mode?: "Hybrid" | "Immersive" | null;
+  level?: string | null;
+  message_index?: number | null;
+  reasons?: string[] | null;
+  user_note?: string | null;
+  assistant_text?: string | null;
+  user_last_text?: string | null;
+  history_preview?: any[] | null;
+  audio_relpath?: string | null;
+  audio_url_at_submit?: string | null;
+  user_id?: string | null;
+  meta?: Record<string, any> | null;
+  resolved_at?: string | null;
+  resolution_note?: string | null;
+}
+
+export interface CreateEscalationPayload {
+  source?: "speaking" | "writing";
+  practiceMode?: "Hybrid" | "Immersive";
+  level?: string;
+  messageIndex?: number;
+  reasons?: string[];
+  userNote?: string;
+  assistantText?: string;
+  userLastText?: string;
+  historyPreview?: ChatMessage[];
+  audioUrl?: string | null;
+  userId?: string;
+  meta?: Record<string, any>;
+}
+
+const jsonFetch = async <T = any>(url: string, init?: RequestInit): Promise<T> => {
+  const res = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => res.statusText);
+    throw new Error(`HTTP ${res.status}: ${msg}`);
+  }
+  return (await res.json()) as T;
+};
+
+export const createEscalation = async (
+  payload: CreateEscalationPayload
+): Promise<Escalation> => {
+  return jsonFetch<Escalation>(`${API_BASE_URL}/api/escalations`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const listEscalations = async (
+  status?: "queued" | "resolved"
+): Promise<Escalation[]> => {
+  const url =
+    status
+      ? `${API_BASE_URL}/api/escalations?status=${encodeURIComponent(status)}`
+      : `${API_BASE_URL}/api/escalations`;
+  return jsonFetch<Escalation[]>(url);
+};
+
+export const resolveEscalation = async (
+  escalationId: string,
+  resolutionNote?: string
+): Promise<Escalation> => {
+  return jsonFetch<Escalation>(
+    `${API_BASE_URL}/api/escalations/${encodeURIComponent(escalationId)}/resolve`,
+    {
+      method: "POST",
+      body: JSON.stringify(
+        resolutionNote ? { resolution_note: resolutionNote } : {}
+      ),
+    }
+  );
+};
+
+export const getEscalation = async (
+  escalationId: string
+): Promise<Escalation> => {
+  return jsonFetch<Escalation>(
+    `${API_BASE_URL}/api/escalations/${encodeURIComponent(escalationId)}`
+  );
+};
+
+export const getEscalationAudioUrl = (escalationId: string): string => {
+  return `${API_BASE_URL}/api/escalations/${encodeURIComponent(
+    escalationId
+  )}/audio`;
 };

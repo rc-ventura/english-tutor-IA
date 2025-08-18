@@ -19,13 +19,21 @@ interface ChatbotProps {
   isLoading: boolean;
   practiceMode: "hybrid" | "immersive";
   botIsSpeaking?: boolean;
+  // Escalation UI (optional)
+  enableEscalation?: boolean;
+  onEscalateRequest?: (messageIndex: number) => void;
+  escalatedIndices?: number[];
 }
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
+  messageIndex: number;
   practiceMode: "hybrid" | "immersive";
-  isLastMessage: boolean;
   botIsSpeaking?: boolean;
+  // Escalation UI per message
+  enableEscalation?: boolean;
+  escalated?: boolean;
+  onEscalate?: () => void;
 }
 
 // --- Helper Functions ---
@@ -54,9 +62,12 @@ const AudioPlayer: React.FC<{ src: string }> = ({ src }) => {
 
 const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   message,
+  messageIndex,
   practiceMode,
-  isLastMessage,
   botIsSpeaking,
+  enableEscalation,
+  escalated,
+  onEscalate,
 }) => {
   const isUser = message.role === "user";
 
@@ -200,6 +211,38 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         }`}
       >
         {renderContent()}
+        {/* Escalation badge/button for user messages */}
+        {isUser && enableEscalation && (
+          <div className="absolute -top-2 -left-2 flex items-center gap-2">
+            {escalated ? (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-400 text-black shadow border border-amber-300">
+                Escalated
+              </span>
+            ) : (
+              <button
+                onClick={onEscalate}
+                className="group pl-2 pr-2.5 py-0.5 text-xs rounded-full bg-gray-900/70 hover:bg-gray-800 text-gray-200 border border-white/10 backdrop-blur-md transition flex items-center gap-1 shadow-sm"
+                aria-label={`Escalate message #${messageIndex}`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300"
+                >
+                  <path d="M4 4v16" />
+                  <path d="M4 6h10l-1.5-2H4" />
+                  <path d="M4 12h10l-1.5-2H4" />
+                </svg>
+                <span>Escalate</span>
+              </button>
+            )}
+          </div>
+        )}
         {!isUser && practiceMode === "hybrid" && (
           <button
             onClick={handleCopy}
@@ -254,6 +297,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
   isLoading,
   practiceMode,
   botIsSpeaking,
+  enableEscalation,
+  onEscalateRequest,
+  escalatedIndices,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -289,9 +335,16 @@ const Chatbot: React.FC<ChatbotProps> = ({
           <ChatMessageBubble
             key={index}
             message={message}
+            messageIndex={index}
             practiceMode={practiceMode}
-            isLastMessage={index === messages.length - 1}
             botIsSpeaking={botIsSpeaking}
+            enableEscalation={enableEscalation}
+            escalated={!!escalatedIndices?.includes(index)}
+            onEscalate={
+              enableEscalation && message.role === "user"
+                ? () => onEscalateRequest && onEscalateRequest(index)
+                : undefined
+            }
           />
         ))}
         {(() => {

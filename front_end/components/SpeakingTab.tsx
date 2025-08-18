@@ -14,6 +14,7 @@ interface SpeakingTabProps {
 }
 
 const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
+  const ENABLE_ESCALATION = (import.meta as any).env?.VITE_ENABLE_ESCALATION === "true";
   const [practiceMode, setPracticeMode] = useState<"hybrid" | "immersive">(
     "hybrid"
   );
@@ -35,6 +36,17 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const awaitingAssistantRef = useRef<boolean>(false);
   const [botSpeaking, setBotSpeaking] = useState<boolean>(false);
   const streamingJobRef = useRef<(() => void) | null>(null);
+  // Track last bot audio URL to include in escalation payload if assistant message isn't populated yet
+  const lastAudioUrlRef = useRef<string | null>(null);
+
+  // Escalation UI state
+  const [escalatedIndices, setEscalatedIndices] = useState<number[]>([]);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [pendingEscalationIdx, setPendingEscalationIdx] = useState<number | null>(
+    null
+  );
+  const [escReasons, setEscReasons] = useState<string[]>([]);
+  const [escNote, setEscNote] = useState("");
 
   useEffect(() => {
     // Escolhe o construtor disponível e tipa para satisfazer o TS
@@ -50,6 +62,71 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
     };
   }, []);
 
+  // ---------- Escalation helpers ----------
+  const handleEscalateRequest = (idx: number) => {
+    if (!ENABLE_ESCALATION) return;
+    setPendingEscalationIdx(idx);
+    setShowEscalateModal(true);
+  };
+
+  const toggleReason = (reason: string) => {
+    setEscReasons((prev) =>
+      prev.includes(reason) ? prev.filter((r) => r !== reason) : [...prev, reason]
+    );
+  };
+
+  const submitEscalation = async () => {
+    if (pendingEscalationIdx == null) return;
+    const idx = pendingEscalationIdx;
+    const msg = messages[idx];
+    const userLastText =
+      typeof msg.content === "string" ? msg.content : (msg as any).text_for_llm || "";
+    const practiceModeLabel = practiceMode === "hybrid" ? "Hybrid" : "Immersive";
+    const assistantMsg = messages.slice(idx + 1).find((m) => m.role === "assistant");
+    const assistantText = assistantMsg
+      ? typeof assistantMsg.content === "string"
+        ? assistantMsg.content
+        : (assistantMsg as any).text_for_llm || null
+      : null;
+    let audioUrl: string | null = null;
+    if (
+      assistantMsg &&
+      assistantMsg.content &&
+      typeof assistantMsg.content === "object" &&
+      "file" in (assistantMsg.content as any)
+    ) {
+      audioUrl = ((assistantMsg.content as any).file as any)?.url ?? null;
+    }
+    // Fallback to last played audio URL if assistant message hasn't populated file.url yet
+    if (!audioUrl && lastAudioUrlRef.current) {
+      audioUrl = lastAudioUrlRef.current;
+    }
+
+    try {
+      await api.createEscalation({
+        source: "speaking",
+        practiceMode: practiceModeLabel,
+        level: englishLevel,
+        messageIndex: idx,
+        reasons: escReasons,
+        userNote: escNote || undefined,
+        assistantText: assistantText || undefined,
+        userLastText,
+        historyPreview: messages,
+        audioUrl,
+      });
+      setEscalatedIndices((prev) => Array.from(new Set([...prev, idx])));
+    } catch (e) {
+      console.error("Failed to create escalation", e);
+      alert("Failed to create escalation");
+    } finally {
+      setShowEscalateModal(false);
+      setPendingEscalationIdx(null);
+      setEscReasons([]);
+      setEscNote("");
+    }
+  };
+
   // Unlocks the audio context on the first user interaction
   const unlockAudioContext = () => {
     if (
@@ -64,6 +141,8 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const playAudio = async (url: string) => {
     if (!audioContextRef.current) return;
     console.log("🔊 Attempting to play audio from URL:", url);
+    // keep latest audio URL for escalation fallback
+    lastAudioUrlRef.current = url;
     try {
       console.log("🔊 Fetching audio from URL...");
       const response = await fetch(url);
@@ -101,7 +180,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       source.connect(audioContextRef.current.destination);
 
       // FIX: Add a small delay to prevent audio quality issues on autoplay
-      const playTimeout = setTimeout(() => {
+      setTimeout(() => {
         console.log("🔊 Starting audio playback after short delay...");
         setBotSpeaking(true);
         source.start(0);
@@ -302,6 +381,9 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           isLoading={isLoading}
           practiceMode={practiceMode}
           botIsSpeaking={botSpeaking}
+          enableEscalation={ENABLE_ESCALATION}
+          onEscalateRequest={handleEscalateRequest}
+          escalatedIndices={escalatedIndices}
         />
       </div>
 
@@ -334,6 +416,70 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
         </div>
       </div>
       <audio ref={audioPlayerRef} className="hidden" />
+
+      {/* Escalation Modal */}
+      {ENABLE_ESCALATION && showEscalateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-gray-800 text-gray-100 shadow-2xl border border-white/10">
+            <div className="px-5 py-4 border-b border-white/10">
+              <h3 className="text-lg font-semibold">Escalate conversation</h3>
+              <p className="text-sm text-gray-400">
+                Select reasons and add an optional note for human review.
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="space-y-2">
+                {[
+                  "Pronunciation issue",
+                  "Inappropriate content",
+                  "Model error",
+                  "Other",
+                ].map((r) => (
+                  <label key={r} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={escReasons.includes(r)}
+                      onChange={() => toggleReason(r)}
+                      className="accent-indigo-500"
+                    />
+                    <span>{r}</span>
+                  </label>
+                ))}
+              </div>
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  className="w-full rounded-md bg-gray-900/60 border border-white/10 p-2 text-gray-100"
+                  rows={3}
+                  value={escNote}
+                  onChange={(e) => setEscNote(e.target.value)}
+                  placeholder="Add any relevant context..."
+                />
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-white/10 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowEscalateModal(false);
+                  setPendingEscalationIdx(null);
+                }}
+                className="px-3 py-2 rounded-md bg-gray-700 hover:bg-gray-600 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitEscalation}
+                className="px-3 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                disabled={pendingEscalationIdx == null || escReasons.length === 0}
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

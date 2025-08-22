@@ -1,9 +1,12 @@
 import base64
 import logging
 import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
+import os
+import re
 
 from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
 
 # Configure o logger para este módulo
 _logger = logging.getLogger(__name__)
@@ -137,3 +140,122 @@ def get_audio_duration(file_path: str) -> float:
     except Exception as e:
         _logger.error(f"Failed to get duration for audio file {file_path}: {e}", exc_info=True)
         return 0.0  # Return 0 if duration can't be determined
+
+
+# ---------------- Pronunciation Metrics ----------------
+def _level_wpm_range(level: Optional[str]) -> Tuple[int, int]:
+    level = (level or "B1").upper()
+    ranges = {
+        "A1": (80, 140),
+        "A2": (100, 160),
+        "B1": (110, 180),
+        "B2": (120, 200),
+        "C1": (130, 210),
+        "C2": (140, 220),
+    }
+    return ranges.get(level, (110, 180))
+
+
+def _safe_dbfs(val: float) -> float:
+    # pydub uses -inf for silence; clamp to a reasonable floor
+    if val == float("-inf"):
+        return -90.0
+    return float(val)
+
+
+def analyze_pronunciation_metrics(
+    file_path: str,
+    transcript: Optional[str] = None,
+    level: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Compute lightweight pronunciation metrics using pydub.
+
+    Returns keys:
+    - duration_sec, speaking_time_sec, speech_ratio, pause_ratio
+    - rms_dbfs, peak_dbfs, clipping_ratio
+    - words, wps, wpm (if transcript provided)
+    - suggested_escalation (bool), reasons (list)
+    """
+    try:
+        audio = AudioSegment.from_file(file_path)
+    except Exception as e:
+        _logger.error("Failed to load audio for metrics: %s", e, exc_info=True)
+        raise
+
+    duration_ms = max(0, len(audio))
+    duration_sec = duration_ms / 1000.0 if duration_ms else 0.0
+
+    # Non-silent detection
+    dbfs = _safe_dbfs(audio.dBFS)
+    silence_thresh = dbfs - 16.0
+    try:
+        nonsilent = detect_nonsilent(audio, min_silence_len=200, silence_thresh=silence_thresh)
+    except Exception:
+        nonsilent = []
+    speaking_ms = sum(max(0, end - start) for start, end in nonsilent)
+    speaking_time_sec = speaking_ms / 1000.0
+    speech_ratio = (speaking_ms / duration_ms) if duration_ms else 0.0
+    pause_ratio = max(0.0, 1.0 - speech_ratio)
+
+    # Loudness & clipping
+    rms_dbfs = _safe_dbfs(audio.dBFS)
+    peak_dbfs = _safe_dbfs(audio.max_dBFS)
+    samples = audio.get_array_of_samples()
+    total_samples = max(1, len(samples))
+    # Max possible amplitude for sample width
+    max_possible = float(2 ** (8 * audio.sample_width - 1) - 1)
+    threshold = 0.98 * max_possible
+    clipped = 0
+    try:
+        for s in samples:
+            if abs(int(s)) >= threshold:
+                clipped += 1
+    except Exception:
+        clipped = 0
+    clipping_ratio = clipped / total_samples
+
+    # Words per second/minute from transcript (optional)
+    words = None
+    wps = None
+    wpm = None
+    if transcript:
+        # Rough tokenization into words (supports simple unicode letters/numbers)
+        tokens = re.findall(r"[\w\dÀ-ÖØ-öø-ÿ']+", transcript, flags=re.UNICODE)
+        words = len(tokens)
+        if speaking_time_sec > 0:
+            wps = words / speaking_time_sec
+            wpm = wps * 60.0
+
+    # Simple rule-based suggestion
+    reasons: List[str] = []
+    if duration_sec < 1.0:
+        reasons.append("too_short")
+    if pause_ratio > 0.6:
+        reasons.append("high_pause_ratio")
+    if clipping_ratio > 0.02:
+        reasons.append("clipping_detected")
+    if wpm is not None:
+        wmin, wmax = _level_wpm_range(level)
+        tolerance = 15
+        if wpm < (wmin - tolerance):
+            reasons.append("too_slow_for_level")
+        if wpm > (wmax + tolerance):
+            reasons.append("too_fast_for_level")
+
+    suggested = len(reasons) > 0
+
+    return {
+        "duration_sec": duration_sec,
+        "speaking_time_sec": speaking_time_sec,
+        "speech_ratio": speech_ratio,
+        "pause_ratio": pause_ratio,
+        "rms_dbfs": rms_dbfs,
+        "peak_dbfs": peak_dbfs,
+        "clipping_ratio": clipping_ratio,
+        "words": words,
+        "wps": wps,
+        "wpm": wpm,
+        "level": level,
+        "suggested_escalation": suggested,
+        "reasons": reasons,
+    }

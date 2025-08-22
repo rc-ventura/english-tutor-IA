@@ -13,6 +13,19 @@ interface GradioMessageContent {
   file?: GradioFile;
 }
 
+// Speaking mini-badges types (UI-only)
+export type BadgeTone = "good" | "warn" | "bad";
+export interface Badge {
+  label: string;
+  tone: BadgeTone;
+  tooltip?: string;
+}
+export interface BadgeTriple {
+  speed: Badge;
+  clarity: Badge;
+  volume: Badge;
+}
+
 // --- Component Props ---
 interface ChatbotProps {
   messages: ChatMessage[];
@@ -23,6 +36,10 @@ interface ChatbotProps {
   enableEscalation?: boolean;
   onEscalateRequest?: (messageIndex: number) => void;
   escalatedIndices?: number[];
+  // Speaking metrics UI (optional)
+  userBadgesByIndex?: Record<number, BadgeTriple>;
+  // Sticky header (e.g., global speaking metrics banner)
+  stickyHeader?: React.ReactNode;
 }
 
 interface ChatMessageBubbleProps {
@@ -34,6 +51,8 @@ interface ChatMessageBubbleProps {
   enableEscalation?: boolean;
   escalated?: boolean;
   onEscalate?: () => void;
+  // Speaking mini-badges for this user message
+  badges?: BadgeTriple;
 }
 
 // --- Helper Functions ---
@@ -68,6 +87,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   enableEscalation,
   escalated,
   onEscalate,
+  badges,
 }) => {
   const isUser = message.role === "user";
 
@@ -171,7 +191,13 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
               <span></span>
               <span></span>
             </div>
-            <span>{isUser ? "Enviando..." : botIsSpeaking ? "Falando..." : "Aguardando..."}</span>
+            <span>
+              {isUser
+                ? "Enviando..."
+                : botIsSpeaking
+                ? "Falando..."
+                : "Aguardando..."}
+            </span>
           </div>
         );
       }
@@ -243,6 +269,30 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
             )}
           </div>
         )}
+        {/* Mini speaking badges for user messages */}
+        {isUser && badges && (
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+            {[
+              ["Speed", badges.speed] as const,
+              ["Clarity", badges.clarity] as const,
+              ["Volume", badges.volume] as const,
+            ].map(([name, b], i) => (
+              <span
+                key={`${name}-${i}`}
+                title={b.tooltip || name}
+                className={`px-1.5 py-0.5 rounded-full border shadow-sm ${
+                  b.tone === "good"
+                    ? "bg-emerald-500/20 text-emerald-200 border-emerald-400/30"
+                    : b.tone === "warn"
+                    ? "bg-amber-500/20 text-amber-200 border-amber-400/30"
+                    : "bg-rose-500/20 text-rose-200 border-rose-400/30"
+                }`}
+              >
+                {name}: {b.label}
+              </span>
+            ))}
+          </div>
+        )}
         {!isUser && practiceMode === "hybrid" && (
           <button
             onClick={handleCopy}
@@ -300,6 +350,8 @@ const Chatbot: React.FC<ChatbotProps> = ({
   enableEscalation,
   onEscalateRequest,
   escalatedIndices,
+  userBadgesByIndex,
+  stickyHeader,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -331,6 +383,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
       className="relative h-full overflow-y-auto p-4 pr-6 chat-scrollbar"
     >
       <div className="max-w-4xl mx-auto">
+        {stickyHeader ? (
+          <div className="sticky top-0 z-20 pb-2">{stickyHeader}</div>
+        ) : null}
         {messages.map((message, index) => (
           <ChatMessageBubble
             key={index}
@@ -344,6 +399,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
               enableEscalation && message.role === "user"
                 ? () => onEscalateRequest && onEscalateRequest(index)
                 : undefined
+            }
+            badges={
+              message.role === "user" ? userBadgesByIndex?.[index] : undefined
             }
           />
         ))}

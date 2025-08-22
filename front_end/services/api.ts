@@ -12,7 +12,14 @@ import type {
 const GRADIO_BASE_URL = import.meta.env.VITE_GRADIO_BASE_URL as string;
 const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string) ||
-  (GRADIO_BASE_URL?.replace(/\/?gradio\/?$/, "") || "");
+  GRADIO_BASE_URL?.replace(/\/?gradio\/?$/, "") ||
+  "";
+
+// Verbose streaming logs only in development or when explicitly enabled
+const VERBOSE_GRADIO_LOGS = Boolean(
+  (import.meta as any).env?.DEV ||
+    (import.meta as any).env?.VITE_VERBOSE_GRADIO_LOGS === "true"
+);
 
 // Conecta ao cliente Gradio usando o endpoint correto (/gradio)
 const clientPromise = Client.connect(GRADIO_BASE_URL).catch((error) => {
@@ -46,7 +53,9 @@ const getFileUrl = (file: FileLike): string | null => {
   }
 
   // If backend sends structured object
-  return file.url ?? (file.path ? `${GRADIO_BASE_URL}/file=${file.path}` : null);
+  return (
+    file.url ?? (file.path ? `${GRADIO_BASE_URL}/file=${file.path}` : null)
+  );
 };
 
 // SET API KEY
@@ -97,18 +106,40 @@ export const handleTranscriptionAndResponse = (
 
       (async () => {
         try {
+          let latestRawMessages: any[] | null = null;
+          let latestAudioFile: any = null;
           for await (const msg of job) {
             if (msg.type === "data") {
-              console.log(" Gradio streaming raw msg.data:", msg.data);
+              if (VERBOSE_GRADIO_LOGS) {
+                console.log(" Gradio streaming raw msg.data:", msg.data);
+              }
               const [rawMessages, audioFile] = msg.data as [any[], any];
-              onData({
-                messages: formatMessages(rawMessages),
-                audioUrl: getFileUrl(audioFile),
-              });
+              latestRawMessages = rawMessages;
+              latestAudioFile = audioFile;
+              if (practiceMode === "immersive") {
+                // During immersive streaming, update messages but suppress audio URL until the end
+                onData({
+                  messages: formatMessages(rawMessages),
+                  audioUrl: null,
+                });
+              } else {
+                // Hybrid: stream audio URL as usual
+                onData({
+                  messages: formatMessages(rawMessages),
+                  audioUrl: getFileUrl(audioFile),
+                });
+              }
             } else if (msg.type === "status" && msg.stage === "error") {
               console.error("Streaming job failed:", msg);
               onError(new Error(msg.message ?? "Streaming error"));
             }
+          }
+          // After the stream ends, if immersive, emit the final audio URL once
+          if (practiceMode === "immersive" && latestAudioFile) {
+            onData({
+              messages: formatMessages(latestRawMessages || []),
+              audioUrl: getFileUrl(latestAudioFile),
+            });
           }
         } catch (streamErr) {
           console.error("Streaming iterator error:", streamErr);
@@ -302,7 +333,10 @@ export interface CreateEscalationPayload {
   meta?: Record<string, any>;
 }
 
-const jsonFetch = async <T = any>(url: string, init?: RequestInit): Promise<T> => {
+const jsonFetch = async <T = any>(
+  url: string,
+  init?: RequestInit
+): Promise<T> => {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
     ...init,
@@ -326,10 +360,9 @@ export const createEscalation = async (
 export const listEscalations = async (
   status?: "queued" | "resolved"
 ): Promise<Escalation[]> => {
-  const url =
-    status
-      ? `${API_BASE_URL}/api/escalations?status=${encodeURIComponent(status)}`
-      : `${API_BASE_URL}/api/escalations`;
+  const url = status
+    ? `${API_BASE_URL}/api/escalations?status=${encodeURIComponent(status)}`
+    : `${API_BASE_URL}/api/escalations`;
   return jsonFetch<Escalation[]>(url);
 };
 
@@ -338,7 +371,9 @@ export const resolveEscalation = async (
   resolutionNote?: string
 ): Promise<Escalation> => {
   return jsonFetch<Escalation>(
-    `${API_BASE_URL}/api/escalations/${encodeURIComponent(escalationId)}/resolve`,
+    `${API_BASE_URL}/api/escalations/${encodeURIComponent(
+      escalationId
+    )}/resolve`,
     {
       method: "POST",
       body: JSON.stringify(
@@ -360,4 +395,37 @@ export const getEscalationAudioUrl = (escalationId: string): string => {
   return `${API_BASE_URL}/api/escalations/${encodeURIComponent(
     escalationId
   )}/audio`;
+};
+
+// ---------- Speaking Metrics API ----------
+export interface SpeakingMetricsPayload {
+  userAudioBase64?: string; // data URL or raw base64
+  userAudioUrl?: string; // absolute path or /file= URL
+  transcript?: string;
+  level?: string; // CEFR
+}
+
+export interface SpeakingMetrics {
+  duration_sec: number;
+  speaking_time_sec: number;
+  speech_ratio: number;
+  pause_ratio: number;
+  rms_dbfs: number;
+  peak_dbfs: number;
+  clipping_ratio: number;
+  words?: number | null;
+  wps?: number | null;
+  wpm?: number | null;
+  level?: string | null;
+  suggested_escalation: boolean;
+  reasons: string[];
+}
+
+export const postSpeakingMetrics = async (
+  payload: SpeakingMetricsPayload
+): Promise<SpeakingMetrics> => {
+  return jsonFetch<SpeakingMetrics>(`${API_BASE_URL}/api/speaking/metrics`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 };

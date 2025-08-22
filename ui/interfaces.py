@@ -3,10 +3,13 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 import os
+import base64
+from urllib.parse import unquote
 from gradio.routes import mount_gradio_app
 from fastapi.middleware.cors import CORSMiddleware
 from typing import TYPE_CHECKING, Optional, Dict, Any
 from src.core.escalation_manager import EscalationManager
+from src.utils.audio import analyze_pronunciation_metrics, save_audio_to_temp_file
 
 if TYPE_CHECKING:
     # Type-only import to avoid circular import at runtime
@@ -239,7 +242,10 @@ def run_gradio_interface(tutor: "EnglishTutor"):
     # Add the CORS middleware to the FastAPI app
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -303,5 +309,77 @@ def run_gradio_interface(tutor: "EnglishTutor"):
             ".flac": "audio/flac",
         }.get(ext, "application/octet-stream")
         return FileResponse(audio_path, media_type=media)
+
+    @app.post("/api/speaking/metrics")
+    async def speaking_metrics(body: Dict[str, Any]):
+        """Compute lightweight pronunciation metrics from user audio.
+
+        Expected JSON body:
+        - userAudioBase64: string (data URL or raw base64)
+        - userAudioUrl: string (optional alternative; Gradio-style /file= URL or absolute path)
+        - transcript: string (optional)
+        - level: string (optional, A1..C2)
+        """
+        user_audio_b64 = (body or {}).get("userAudioBase64")
+        user_audio_url = (body or {}).get("userAudioUrl")
+        transcript = (body or {}).get("transcript")
+        level = (body or {}).get("level")
+
+        audio_path = None
+        tmp_path = None
+
+        try:
+            if user_audio_b64:
+                data = user_audio_b64
+                suffix = ".wav"
+                if isinstance(data, str) and data.startswith("data:"):
+                    try:
+                        header, b64data = data.split(",", 1)
+                    except ValueError:
+                        raise HTTPException(status_code=400, detail="Invalid data URL format")
+                    mime = header.split(";")[0].split(":")[-1].lower()
+                    suffix = {
+                        "audio/wav": ".wav",
+                        "audio/x-wav": ".wav",
+                        "audio/mpeg": ".mp3",
+                        "audio/mp4": ".m4a",
+                        "audio/webm": ".webm",
+                        "audio/ogg": ".ogg",
+                        "audio/flac": ".flac",
+                    }.get(mime, ".wav")
+                    raw = base64.b64decode(b64data)
+                else:
+                    raw = base64.b64decode(str(data))
+
+                tmp_path = save_audio_to_temp_file(raw, suffix=suffix)
+                audio_path = tmp_path
+            elif user_audio_url:
+                url = str(user_audio_url)
+                # Absolute local path
+                if os.path.isabs(url) and os.path.exists(url):
+                    audio_path = url
+                else:
+                    # Try to extract local path from Gradio-style URL: /file=/abs/path
+                    local_path = None
+                    if "file=" in url:
+                        local_path = url.split("file=")[-1]
+                        if "?" in local_path:
+                            local_path = local_path.split("?")[0]
+                        local_path = unquote(local_path)
+                    if local_path and os.path.exists(local_path):
+                        audio_path = local_path
+                    else:
+                        raise HTTPException(status_code=400, detail="userAudioUrl is not resolvable on server")
+            else:
+                raise HTTPException(status_code=400, detail="Provide userAudioBase64 or userAudioUrl")
+
+            metrics = analyze_pronunciation_metrics(audio_path, transcript=transcript, level=level)
+            return metrics
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
 
     return app

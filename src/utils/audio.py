@@ -175,6 +175,8 @@ def analyze_pronunciation_metrics(
     - rms_dbfs, peak_dbfs, clipping_ratio
     - words, wps, wpm (if transcript provided)
     - suggested_escalation (bool), reasons (list)
+    - pronunciation_score (0-100), pronunciation_reasons (list[str])
+    - word_scores (optional, None for MVP)
     """
     try:
         audio = AudioSegment.from_file(file_path)
@@ -226,7 +228,7 @@ def analyze_pronunciation_metrics(
             wps = words / speaking_time_sec
             wpm = wps * 60.0
 
-    # Simple rule-based suggestion
+    # Simple rule-based suggestion (technical, for escalation)
     reasons: List[str] = []
     if duration_sec < 1.0:
         reasons.append("too_short")
@@ -244,6 +246,58 @@ def analyze_pronunciation_metrics(
 
     suggested = len(reasons) > 0
 
+    # ---------------- Pronunciation proxy (MVP) ----------------
+    # Start from 100 and apply penalties based on clarity proxies.
+    pron_reasons: List[str] = []
+    score = 100.0
+
+    # Duration very short -> large penalty
+    if duration_sec < 1.0:
+        score -= 30
+        pron_reasons.append("too_short")
+
+    # Pause ratio: >0.6 strong penalty, else mild proportional penalty
+    if pause_ratio > 0.6:
+        score -= 25
+        pron_reasons.append("high_pause_ratio")
+    else:
+        score -= max(0.0, (pause_ratio - 0.3) / 0.3) * 15.0  # 0..15 penalty between 30%-60%
+        if pause_ratio > 0.3:
+            pron_reasons.append("moderate_pauses")
+
+    # Clipping
+    if clipping_ratio > 0.02:
+        score -= 25
+        pron_reasons.append("clipping_detected")
+    elif clipping_ratio > 0.005:
+        score -= 10
+        pron_reasons.append("slight_clipping")
+
+    # Loudness window: target around -20..-12 dBFS
+    if rms_dbfs <= -40:
+        score -= 30
+        pron_reasons.append("very_low_volume")
+    elif rms_dbfs <= -28:
+        score -= 15
+        pron_reasons.append("low_volume")
+    elif rms_dbfs >= -6:
+        score -= 25
+        pron_reasons.append("too_loud")
+    elif rms_dbfs >= -10:
+        score -= 10
+        pron_reasons.append("loud")
+
+    # Very low speech content overall
+    if speech_ratio < 0.3:
+        score -= 15
+        pron_reasons.append("low_speech_ratio")
+
+    # Clamp score
+    pronunciation_score = int(max(0, min(100, round(score))))
+
+    # MVP: word-level scores not yet computed
+    word_scores = None
+
     return {
         "duration_sec": duration_sec,
         "speaking_time_sec": speaking_time_sec,
@@ -258,4 +312,7 @@ def analyze_pronunciation_metrics(
         "level": level,
         "suggested_escalation": suggested,
         "reasons": reasons,
+        "pronunciation_score": pronunciation_score,
+        "pronunciation_reasons": pron_reasons,
+        "word_scores": word_scores,
     }

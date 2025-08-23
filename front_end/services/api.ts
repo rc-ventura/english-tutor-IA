@@ -72,7 +72,8 @@ export const handleTranscriptionAndResponse = (
   level: EnglishLevel,
   practiceMode: "hybrid" | "immersive",
   onData: (data: { messages: ChatMessage[]; audioUrl: string | null }) => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  onComplete?: () => void
 ) => {
   let job: ReturnType<Client["submit"]>;
 
@@ -141,6 +142,8 @@ export const handleTranscriptionAndResponse = (
               audioUrl: getFileUrl(latestAudioFile),
             });
           }
+          // Signal normal completion
+          if (onComplete) onComplete();
         } catch (streamErr) {
           console.error("Streaming iterator error:", streamErr);
           onError(streamErr as Error);

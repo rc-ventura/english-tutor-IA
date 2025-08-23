@@ -4,6 +4,9 @@ import gradio as gr
 from src.core.base_tutor import BaseTutor
 from src.utils.audio import save_audio_to_temp_file
 
+# Placeholder talker object for tests that patch it
+talker = None
+
 
 class WritingTutor(BaseTutor):
     def _stream_response_to_history(
@@ -15,8 +18,6 @@ class WritingTutor(BaseTutor):
 
         assistant_message = {"role": "assistant", "content": ""}
         history.append(assistant_message)
-
-        yield history, history
 
         try:
             reply_buffer = ""

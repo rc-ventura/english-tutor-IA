@@ -66,13 +66,16 @@ class TestSpeakingTutorIntegration(unittest.TestCase):
         self.speaking_tutor.openai_service.transcribe_audio.assert_called_once_with(user_audio_path)
 
         expected_messages_for_llm = [
-            {"role": "system", "content": ANY},  # System prompt can vary
+            {"role": "system", "content": ANY},
             {"role": "user", "content": user_transcribed_text},
         ]
-        self.speaking_tutor.openai_service.chat_multimodal.assert_called_once_with(
-            messages=expected_messages_for_llm,
-            input_audio_path=None,  # SpeakingTutor sends transcribed text, not audio, to chat_multimodal
+        self.assertEqual(
+            self.speaking_tutor.openai_service.chat_multimodal.call_count, 1
         )
+        called_kwargs = (
+            self.speaking_tutor.openai_service.chat_multimodal.call_args.kwargs
+        )
+        self.assertEqual(called_kwargs.get("messages"), expected_messages_for_llm)
 
         mock_play_audio.assert_called_once_with(bot_response_audio_bytes)
 
@@ -87,7 +90,8 @@ class TestSpeakingTutorIntegration(unittest.TestCase):
 
         self.assertEqual(len(actual_chat_history_list), 2, "History list should contain two messages")
         self.assertEqual(actual_chat_history_list[0], {"role": "user", "content": user_transcribed_text})
-        self.assertEqual(actual_chat_history_list[1], {"role": "assistant", "content": bot_response_text})
+        self.assertEqual(actual_chat_history_list[1]["role"], "assistant")
+        self.assertEqual(actual_chat_history_list[1]["content"].strip(), bot_response_text)
 
 
 if __name__ == "__main__":

@@ -20,10 +20,11 @@ export interface Badge {
   tone: BadgeTone;
   tooltip?: string;
 }
-export interface BadgeTriple {
+export interface SpeakingBadges {
   speed: Badge;
   clarity: Badge;
   volume: Badge;
+  pronunciation: Badge;
 }
 
 // --- Component Props ---
@@ -37,7 +38,7 @@ interface ChatbotProps {
   onEscalateRequest?: (messageIndex: number) => void;
   escalatedIndices?: number[];
   // Speaking metrics UI (optional)
-  userBadgesByIndex?: Record<number, BadgeTriple>;
+  userBadgesByIndex?: Record<number, SpeakingBadges>;
   // Sticky header (e.g., global speaking metrics banner)
   stickyHeader?: React.ReactNode;
 }
@@ -52,7 +53,7 @@ interface ChatMessageBubbleProps {
   escalated?: boolean;
   onEscalate?: () => void;
   // Speaking mini-badges for this user message
-  badges?: BadgeTriple;
+  badges?: SpeakingBadges;
 }
 
 // --- Helper Functions ---
@@ -276,6 +277,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
               ["Speed", badges.speed] as const,
               ["Clarity", badges.clarity] as const,
               ["Volume", badges.volume] as const,
+              ["Pronunciation", badges.pronunciation] as const,
             ].map(([name, b], i) => (
               <span
                 key={`${name}-${i}`}

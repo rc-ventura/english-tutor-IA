@@ -5,6 +5,10 @@ from src.core.writing_tutor import WritingTutor
 
 
 class DummyParent:
+    def __init__(self, service=None):
+        self.progress_tracker = MagicMock()
+        self.openai_service = service
+
     def get_system_message(self, mode="writing", level=None):
         return "sys"
 
@@ -12,10 +16,11 @@ class DummyParent:
 def test_writing_tutor_process_input_streams():
     service = MagicMock()
     service.stream_chat_completion.return_value = iter(["Hello", " world"])
+    parent = DummyParent(service)
     with patch("src.core.writing_tutor.talker"):
-        tutor = WritingTutor(service, DummyParent())
+        tutor = WritingTutor(service, parent)
         history = []
-        gen = tutor.process_input("My essay", history, level="B1")
+        gen = tutor.process_input("My essay", history, writing_type="essay", level="B1")
         import copy
 
         first = copy.deepcopy(next(gen))
@@ -34,8 +39,9 @@ def test_writing_tutor_process_input_streams():
 def test_writing_tutor_generate_random_topic_streams():
     service = MagicMock()
     service.stream_chat_completion.return_value = iter(["Topic", " suggestion"])
+    parent = DummyParent(service)
     with patch("src.core.writing_tutor.talker"):
-        tutor = WritingTutor(service, DummyParent())
+        tutor = WritingTutor(service, parent)
         history = []
         gen = tutor.generate_random_topic(level="B1", history=history)
         import copy
@@ -53,20 +59,18 @@ def test_writing_tutor_generate_random_topic_streams():
 def test_speaking_tutor_process_input_streams():
     service = MagicMock()
     service.stream_chat_completion.return_value = iter(["Hi", " there"])
+    parent = DummyParent(service)
     with patch("src.core.speaking_tutor.talker"):
-        tutor = SpeakingTutor(service, DummyParent())
+        tutor = SpeakingTutor(service, parent)
         history = [{"role": "user", "content": "Hello"}]
         gen = tutor.process_input(history, level="A1")
         import copy
 
         first = copy.deepcopy(next(gen))
         second = copy.deepcopy(next(gen))
-        last = None
+        last = second
         for item in gen:
             last = copy.deepcopy(item)
     assert first[0][-1]["content"] == "Hi"
     assert second[0][-1]["content"] == "Hi there"
     assert last[0][-1]["content"] == "Hi there"
-    outputs = list(gen)
-    assert outputs[0][0][-1]["content"] == "Hello"
-    assert outputs[-1][0][-1]["content"] == "Hello world"

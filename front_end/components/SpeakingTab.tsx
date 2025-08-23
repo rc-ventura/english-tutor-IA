@@ -8,7 +8,7 @@ import {
   MessageSquareTextIcon,
 } from "./icons/Icons";
 import * as api from "../services/api";
-import type { Badge, BadgeTriple } from "./Chatbot";
+import type { Badge, SpeakingBadges } from "./Chatbot";
 
 // Local types and REST helper for Speaking Metrics (avoid coupling to api.ts for now)
 interface SpeakingMetrics {
@@ -25,6 +25,9 @@ interface SpeakingMetrics {
   level?: string | null;
   suggested_escalation: boolean;
   reasons: string[];
+  pronunciation_score?: number | null;
+  pronunciation_reasons?: string[] | null;
+  word_scores?: { word: string; score: number }[] | null;
 }
 
 const API_BASE_URL: string =
@@ -72,7 +75,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const [speakingMetrics, setSpeakingMetrics] =
     useState<SpeakingMetrics | null>(null);
   const [userBadgesByIndex, setUserBadgesByIndex] = useState<
-    Record<number, BadgeTriple>
+    Record<number, SpeakingBadges>
   >({});
   const [bannerVisible, setBannerVisible] = useState<boolean>(true);
   const bannerTimerRef = useRef<number | null>(null);
@@ -533,7 +536,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   function buildBadgesFromMetrics(
     m: SpeakingMetrics,
     level: EnglishLevel | string
-  ): BadgeTriple {
+  ): SpeakingBadges {
     // Speed badge
     const { min, max } = levelWpmRange(level);
     const tol = 15;
@@ -621,7 +624,39 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       };
     }
 
-    return { speed, clarity, volume };
+    // Pronunciation badge (MVP heuristics)
+    let pronunciation: Badge;
+    if (typeof m.pronunciation_score !== "number") {
+      pronunciation = {
+        label: "—",
+        tone: "warn",
+        tooltip: "Pronunciation not evaluated",
+      };
+    } else if (m.pronunciation_score >= 80) {
+      pronunciation = {
+        label: "Good",
+        tone: "good",
+        tooltip: `Score ${m.pronunciation_score}`,
+      };
+    } else if (m.pronunciation_score >= 60) {
+      pronunciation = {
+        label: "Fair",
+        tone: "warn",
+        tooltip:
+          m.pronunciation_reasons?.join(", ") ||
+          `Score ${m.pronunciation_score}`,
+      };
+    } else {
+      pronunciation = {
+        label: "Weak",
+        tone: "bad",
+        tooltip:
+          m.pronunciation_reasons?.join(", ") ||
+          `Score ${m.pronunciation_score}`,
+      };
+    }
+
+    return { speed, clarity, volume, pronunciation };
   }
 
   const Pill: React.FC<{ badge: Badge; name: string }> = ({ badge, name }) => (
@@ -670,7 +705,12 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             : "Lower input volume to avoid distortion."
         );
       }
-      return tips.length ? tips.join(" ") : "Great pace, clarity, and volume!";
+      if (badges.pronunciation.tone !== "good") {
+        tips.push("Work on clearer pronunciation.");
+      }
+      return tips.length
+        ? tips.join(" ")
+        : "Great pace, clarity, volume, and pronunciation!";
     })();
 
     const styleBase = metrics.suggested_escalation
@@ -683,6 +723,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           <Pill name="Speed" badge={badges.speed} />
           <Pill name="Clarity" badge={badges.clarity} />
           <Pill name="Volume" badge={badges.volume} />
+          <Pill name="Pronunciation" badge={badges.pronunciation} />
           <button
             type="button"
             aria-label="Close speaking tips"

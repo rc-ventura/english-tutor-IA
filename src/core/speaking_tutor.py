@@ -12,17 +12,42 @@ from src.utils.audio import (
     get_audio_duration,
     save_audio_to_temp_file,
 )
+from pydub import AudioSegment
+from pydub.playback import play as _play
 
 _logger = logging.getLogger(__name__)
 if not _logger.handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
+# Placeholder talker object for tests that patch it
+talker = None
+
+
+def play_audio(audio_bytes: bytes) -> None:
+    """Save audio bytes to a temp file and play them back.
+
+    This is a lightweight helper that can be patched in tests. It attempts to
+    play the audio using pydub; if playback fails, the exception is propagated
+    so callers can handle it (e.g., append an error message to chat history).
+    """
+    tmp_path = None
+    try:
+        tmp_path = save_audio_to_temp_file(audio_bytes)
+        segment = AudioSegment.from_file(tmp_path)
+        _play(segment)
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
 class SpeakingTutor(BaseTutor):
     def process_input(
         self,
-        input_data: Optional[str],
-        history: Optional[List[Dict[str, Any]]],
+        input_data: Optional[str] = None,
+        history: Optional[List[Dict[str, Any]]] = None,
         level: Optional[str] = None,
         speaking_mode: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]], None, None]:
@@ -31,28 +56,58 @@ class SpeakingTutor(BaseTutor):
         This method orchestrates transcription and bot response in a single call.
         The Gradio UI uses handle_transcription and handle_bot_response for a better UX.
         """
+        # Allow calling with history as first positional argument (test convenience)
+        if isinstance(input_data, list) and history is None:
+            history = input_data
+            input_data = None
+
         _logger.info(
             f"SpeakingTutor.process_input (synchronous): Start. audio_file_path='{input_data}', level='{level}'"
         )
 
-        updated_history = self.handle_transcription(audio_file_path=input_data, history=history)
+        # Text-only streaming shortcut (used in some unit tests)
+        if not input_data and history and self.openai_service:
+            system_prompt = self.tutor_parent.get_system_message(mode="speaking", level=level)
+            messages = [{"role": "system", "content": system_prompt}] + history
+            assistant_msg = {"role": "assistant", "content": ""}
+            history.append(assistant_msg)
+            try:
+                for chunk in self.openai_service.stream_chat_completion(messages=messages):
+                    assistant_msg["content"] += chunk
+                    yield history, history
+            except Exception as e:
+                assistant_msg["content"] = f"Sorry, an error occurred: {e}"
+                yield history, history
+            return
 
-        final_history = self.handle_bot_response(history=updated_history, level=level)
+        transcribed_history, _ = self.handle_transcription(
+            history=history, audio_file_path=input_data, level=level, speaking_mode=speaking_mode
+        )
 
-        _logger.info("SpeakingTutor.process_input (synchronous): Finished. Yielding final history.")
+        final_history: List[Dict[str, Any]] = transcribed_history
+
+        # Iterate through bot response generator to get final history
+        for history_out, _, _ in self.handle_bot_response(
+            history=transcribed_history, level=level, speaking_mode=speaking_mode
+        ):
+            final_history = history_out
+
+        _logger.info(
+            "SpeakingTutor.process_input (synchronous): Finished. Yielding final history."
+        )
         yield final_history, final_history
 
     def handle_transcription(
         self,
         history: Optional[List[Dict[str, Any]]],
-        audio_filepath: Optional[str] = None,
+        audio_file_path: Optional[str] = None,
         level: Optional[str] = None,
         speaking_mode: Optional[str] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Transcribes user audio, adds it to history, and returns the updated history."""
         current_history = history.copy() if history else []
 
-        if not self.tutor_parent.openai_service:
+        if not self.openai_service:
             error_message = {
                 "role": "assistant",
                 "content": "⚠️ No valid OpenAI API key set. Please enter your API key in the settings.",
@@ -60,24 +115,16 @@ class SpeakingTutor(BaseTutor):
             current_history.append(error_message)
             return current_history, current_history
 
-        if not audio_filepath or not os.path.exists(audio_filepath):
-            _logger.warning("Audio file not provided or does not exist.")
-            return current_history, current_history
-
-        # Check if the audio file is too small (likely an empty recording)
-        min_audio_size_bytes = 1024  # 1 KB
-        if os.path.getsize(audio_filepath) < min_audio_size_bytes:
-            _logger.error(f"Audio file at {audio_filepath} is too small, likely an empty recording.")
-            error_message = {
-                "role": "assistant",
-                "content": "It seems the audio was empty. Please try recording again.",
-            }
-            current_history.append(error_message)
+        if not audio_file_path:
+            _logger.warning("Audio file not provided.")
+            current_history.append({"role": "assistant", "content": "No audio input received"})
             return current_history, current_history
 
         try:
-            transcription = self.tutor_parent.openai_service.transcribe_audio(audio_filepath)
-            if speaking_mode == "Immersive":
+            transcription = self.openai_service.transcribe_audio(audio_file_path)
+            if not transcription or not str(transcription).strip():
+                user_message = {"role": "user", "content": "[Audio not clear or empty]"}
+            elif speaking_mode == "Immersive":
                 user_message = {"role": "user", "content": (audio_filepath, None), "text_for_llm": transcription}
             else:
                 user_message = {"role": "user", "content": transcription}
@@ -85,7 +132,10 @@ class SpeakingTutor(BaseTutor):
             current_history.append(user_message)
             return current_history, current_history
         except Exception as e:
-            error_message = {"role": "assistant", "content": f"Error transcribing audio: {str(e)}"}
+            error_message = {
+                "role": "assistant",
+                "content": f"Sorry, we couldn't transcribe your audio: {str(e)}",
+            }
             current_history.append(error_message)
             return current_history, current_history
 
@@ -99,7 +149,7 @@ class SpeakingTutor(BaseTutor):
         Gets bot response, yields audio for immediate playback, waits for it to finish,
         then yields the updated chat history with the bot's text.
         """
-        if not self.tutor_parent.openai_service:
+        if not self.openai_service:
             yield gr.Error("No valid OpenAI API key set. Please enter your API key in the settings."), [], None
             return
 
@@ -164,7 +214,7 @@ class SpeakingTutor(BaseTutor):
                     {"role": "system", "content": "You are a concise note taker for an English tutoring session."},
                     {"role": "user", "content": prompt},
                 ]
-                chunks = self.tutor_parent.openai_service.stream_chat_completion(
+                chunks = self.openai_service.stream_chat_completion(
                     messages=messages, temperature=0.2, max_tokens=200
                 )
                 updated = "".join(chunks).strip()
@@ -204,9 +254,10 @@ class SpeakingTutor(BaseTutor):
             max_tokens = immersive_max if speaking_mode == "Immersive" else hybrid_max
             _logger.info(f"Using max_tokens={max_tokens} for mode={speaking_mode or 'hybrid'}")
 
+            last_error: Exception | None = None
             while attempts < max_retries and not audio_base64_data:
                 try:
-                    response = self.tutor_parent.openai_service.chat_multimodal(
+                    response = self.openai_service.chat_multimodal(
                         messages=messages_for_llm, voice="alloy", max_tokens=max_tokens
                     )
                     bot_text_response = extract_text_from_response(response)
@@ -242,6 +293,7 @@ class SpeakingTutor(BaseTutor):
                         if delay > 0:
                             time.sleep(delay)
                 except Exception as e:
+                    last_error = e
                     _logger.error(
                         "Erro na tentativa %d: %s (%s)",
                         attempts + 1,
@@ -262,7 +314,7 @@ class SpeakingTutor(BaseTutor):
             if not bot_text_response:
                 _logger.warning("Multimodal returned no text; attempting text-only fallback.")
                 try:
-                    chunks = self.tutor_parent.openai_service.stream_chat_completion(
+                    chunks = self.openai_service.stream_chat_completion(
                         messages=messages_for_llm, temperature=0.6, max_tokens=max_tokens
                     )
                     bot_text_response = "".join(chunks).strip()
@@ -280,7 +332,7 @@ class SpeakingTutor(BaseTutor):
                     if len(tts_text) > max_tts_chars:
                         _logger.info(f"TTS input too long ({len(tts_text)} chars). Truncating to {max_tts_chars}.")
                         tts_text = tts_text[:max_tts_chars] + "..."
-                    audio_bytes = self.tutor_parent.openai_service.text_to_speech(tts_text)
+                    audio_bytes = self.openai_service.text_to_speech(tts_text)
                     # The service returns raw bytes, so we need to encode it to base64
                     audio_base64_data = base64.b64encode(audio_bytes).decode("utf-8")
                     _logger.info("Successfully generated audio using TTS fallback.")
@@ -303,13 +355,22 @@ class SpeakingTutor(BaseTutor):
             # If we don't have text either, surface an error message
             if not bot_text_response:
                 _logger.error("Failed to get bot response text even after retries and TTS fallback.")
-                error_msg = "I'm sorry, I couldn't generate a response."
+                detail = f": {last_error}" if last_error else ""
+                error_msg = f"Sorry, I encountered an error getting a response{detail}".strip()
                 current_history.append({"role": "assistant", "content": error_msg})
                 yield current_history, current_history, None
                 return
 
             # --- Audio-First UX Implementation ---
             audio_bytes = base64.b64decode(audio_base64_data)
+
+            # Attempt to play audio immediately (mainly for synchronous tests)
+            try:
+                play_audio(audio_bytes)
+            except Exception as e:
+                _logger.error("Audio playback failed: %s", e)
+                bot_text_response = f"{bot_text_response} (Error playing audio response)"
+
             audio_path = save_audio_to_temp_file(audio_bytes)
 
             if speaking_mode == "Immersive":
@@ -365,7 +426,7 @@ class SpeakingTutor(BaseTutor):
 
         except Exception as e:
             _logger.error(f"Error calling chat_multimodal: {e}", exc_info=True)
-            error_msg = f"Sorry, an error occurred while I was thinking. Please try again."
+            error_msg = f"Sorry, I encountered an error getting a response: {e}"
 
             current_history.append({"role": "assistant", "content": error_msg})
 

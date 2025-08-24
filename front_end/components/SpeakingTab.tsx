@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChatMessage, EnglishLevel } from "../types";
 import Chatbot from "./Chatbot";
+import PronunciationProgress from "./PronunciationProgress";
 import {
   MicIcon,
   StopCircleIcon,
@@ -23,8 +24,27 @@ interface SpeakingMetrics {
   wps?: number | null;
   wpm?: number | null;
   level?: string | null;
+  pronunciation_score?: number; // Score de pronúncia (0-100)
+  pronunciation_reasons?: string[]; // Razões para o score de pronúncia
   suggested_escalation: boolean;
   reasons: string[];
+}
+
+// Histórico de pronúncia para persistir progresso do usuário
+interface PronunciationHistoryEntry {
+  timestamp: number; // Unix timestamp
+  score: number; // Score combinado (0-100)
+  originalScore?: number; // Score original do backend, se disponível
+  rhythmScore?: number; // Score de ritmo calculado
+  issues?: string[]; // Problemas identificados
+  level: string; // Nível do usuário no momento da gravação
+  transcription?: string; // Transcrição do áudio, se disponível
+}
+
+interface PronunciationHistory {
+  entries: PronunciationHistoryEntry[];
+  // Persist apenas os últimos N registros (padrão: 20)
+  maxEntries: number;
 }
 
 const API_BASE_URL: string =
@@ -52,7 +72,37 @@ const postSpeakingMetrics = async (payload: {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(await res.text());
-  return (await res.json()) as SpeakingMetrics;
+  const metrics = (await res.json()) as SpeakingMetrics;
+
+  // Processar métricas para histórico de pronúncia
+  if (metrics) {
+    try {
+      // Calcular scores avançados de pausas e ritmo
+      const rhythmAnalysis = analyzePausesAndRhythm(metrics, payload.level || 'B1');
+
+      // Calcular score combinado
+      let finalScore: number;
+      if (typeof metrics.pronunciation_score === "number") {
+        finalScore = metrics.pronunciation_score * 0.7 + rhythmAnalysis.level_adjusted_score * 0.3;
+      } else {
+        finalScore = rhythmAnalysis.level_adjusted_score;
+      }
+
+      // Adicionar entrada ao histórico
+      addPronunciationHistoryEntry(
+        finalScore,
+        metrics.pronunciation_score,
+        rhythmAnalysis.level_adjusted_score,
+        rhythmAnalysis.rhythm_issues,
+        payload.level,
+        payload.transcript
+      );
+    } catch (e) {
+      console.error("Error saving pronunciation history:", e);
+    }
+  }
+
+  return metrics;
 };
 
 interface SpeakingTabProps {
@@ -67,6 +117,190 @@ export const __TEST_ONLY__ = {
   setIsLoading: null as null | React.Dispatch<React.SetStateAction<boolean>>,
   setBotSpeaking: null as null | React.Dispatch<React.SetStateAction<boolean>>,
 };
+
+// Alternativa 2: Análise avançada de pausas e ritmo
+function analyzePausesAndRhythm(m: SpeakingMetrics, level: EnglishLevel | string): {
+  rhythm_issues: string[];
+  pause_feedback: string;
+  level_adjusted_score: number;
+} {
+  const L = String(level ?? "B1").toUpperCase();
+  const rhythm_issues: string[] = [];
+  let pause_feedback = "";
+  let level_adjusted_score = 0;
+
+  // Análise de pausas baseada no nível do usuário
+  // Níveis iniciantes podem ter mais pausas
+  const pauseThresholds: Record<string, { acceptable: number; excessive: number }> = {
+    A1: { acceptable: 0.5, excessive: 0.7 },
+    A2: { acceptable: 0.45, excessive: 0.65 },
+    B1: { acceptable: 0.4, excessive: 0.6 },
+    B2: { acceptable: 0.35, excessive: 0.55 },
+    C1: { acceptable: 0.3, excessive: 0.5 },
+    C2: { acceptable: 0.25, excessive: 0.45 },
+  };
+
+  const thresholds = pauseThresholds[L] ?? pauseThresholds.B1;
+
+  if (m.pause_ratio <= thresholds.acceptable) {
+    pause_feedback = "Good pause pattern for your level.";
+  } else if (m.pause_ratio <= thresholds.excessive) {
+    pause_feedback = `Slightly too many pauses for ${L} level. Try to connect your phrases.`;
+    rhythm_issues.push("excessive_pauses");
+  } else {
+    pause_feedback = `Too many or too long pauses for ${L} level. Practice connecting your thoughts.`;
+    rhythm_issues.push("long_pauses");
+  }
+
+  // Análise de ritmo baseada na duração média das frases
+  // Calculado aproximadamente usando palavras, tempo de fala e pausa
+  if (typeof m.words === "number" && m.words > 0 && m.speaking_time_sec > 0) {
+    const avgWordsPerPhrase = m.words / (Math.max(1, m.pause_ratio * 10));
+
+    // Comprimento médio esperado de frases por nível
+    const expectedPhraseLength: Record<string, { min: number; max: number }> = {
+      A1: { min: 2, max: 4 },
+      A2: { min: 3, max: 5 },
+      B1: { min: 4, max: 7 },
+      B2: { min: 5, max: 10 },
+      C1: { min: 6, max: 12 },
+      C2: { min: 7, max: 15 },
+    };
+
+    const expected = expectedPhraseLength[L] ?? expectedPhraseLength.B1;
+
+    if (avgWordsPerPhrase < expected.min) {
+      rhythm_issues.push("short_phrases");
+    } else if (avgWordsPerPhrase > expected.max * 1.5) {
+      // Se as frases são muito longas, pode indicar falta de pausas naturais
+      rhythm_issues.push("run_on_sentences");
+    }
+  }
+
+  // Score ajustado ao nível
+  // Base: 50-100 pontos, com ajustes por nível e problemas detectados
+  const baseScore = Math.max(50, 100 - (m.pause_ratio * 100));
+  // Ajuste por nível: iniciantes recebem bonificação
+  const levelAdjustment = (L === "A1" || L === "A2") ? 10 : (L === "B1" || L === "B2") ? 5 : 0;
+  // Penalidade por problemas detectados
+  const issuesPenalty = rhythm_issues.length * 5;
+
+  level_adjusted_score = Math.min(100, Math.max(0, baseScore + levelAdjustment - issuesPenalty));
+
+  return {
+    rhythm_issues,
+    pause_feedback,
+    level_adjusted_score
+  };
+}
+
+// Funções para gerenciar o histórico de pronúncia no localStorage
+const PRONUNCIATION_HISTORY_KEY = "sophia_pronunciation_history";
+
+function getPronunciationHistory(): PronunciationHistory {
+  try {
+    const stored = localStorage.getItem(PRONUNCIATION_HISTORY_KEY);
+    if (stored) {
+      return JSON.parse(stored) as PronunciationHistory;
+    }
+  } catch (e) {
+    console.error("Error loading pronunciation history:", e);
+  }
+
+  // Retorna histórico vazio se não existir ou houver erro
+  return { entries: [], maxEntries: 20 };
+}
+
+function savePronunciationHistory(history: PronunciationHistory): void {
+  try {
+    localStorage.setItem(PRONUNCIATION_HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    console.error("Error saving pronunciation history:", e);
+  }
+}
+
+function addPronunciationHistoryEntry(
+  score: number,
+  originalScore?: number,
+  rhythmScore?: number,
+  issues?: string[],
+  level?: string,
+  transcription?: string
+): void {
+  const history = getPronunciationHistory();
+
+  const entry: PronunciationHistoryEntry = {
+    timestamp: Date.now(),
+    score,
+    originalScore,
+    rhythmScore,
+    issues,
+    level: level ?? "B1",
+    transcription
+  };
+
+  // Adicionar nova entrada no início do array
+  history.entries.unshift(entry);
+
+  // Limitar o número de entradas
+  if (history.entries.length > history.maxEntries) {
+    history.entries = history.entries.slice(0, history.maxEntries);
+  }
+
+  savePronunciationHistory(history);
+}
+
+function getPronunciationProgress(): {
+  recent: number | null; // Score mais recente
+  average: number | null; // Média dos últimos 5
+  trend: "up" | "down" | "stable" | null; // Tendência
+} {
+  const history = getPronunciationHistory();
+
+  if (history.entries.length === 0) {
+    return { recent: null, average: null, trend: null };
+  }
+
+  // Score mais recente
+  const recent = history.entries[0].score;
+
+  // Média dos últimos 5 (ou menos se não houver 5)
+  const lastFive = history.entries.slice(0, Math.min(5, history.entries.length));
+  const average = lastFive.reduce((sum, entry) => sum + entry.score, 0) / lastFive.length;
+
+  // Calcular tendência
+  let trend: "up" | "down" | "stable" | null = null;
+
+  if (history.entries.length >= 3) {
+    // Calcular a média dos 3 mais recentes e dos 3 anteriores (se houver)
+    const recentAvg = history.entries.slice(0, 3).reduce((sum, entry) => sum + entry.score, 0) / 3;
+
+    if (history.entries.length >= 6) {
+      const olderAvg = history.entries.slice(3, 6).reduce((sum, entry) => sum + entry.score, 0) / 3;
+
+      if (recentAvg >= olderAvg + 5) {
+        trend = "up";
+      } else if (recentAvg <= olderAvg - 5) {
+        trend = "down";
+      } else {
+        trend = "stable";
+      }
+    } else {
+      // Se não temos 6 entradas, comparamos com a primeira entrada
+      const firstScore = history.entries[history.entries.length - 1].score;
+
+      if (recentAvg >= firstScore + 5) {
+        trend = "up";
+      } else if (recentAvg <= firstScore - 5) {
+        trend = "down";
+      } else {
+        trend = "stable";
+      }
+    }
+  }
+
+  return { recent, average, trend };
+}
 
 const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const ENABLE_ESCALATION =
@@ -88,6 +322,11 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const [userBadgesByIndex, setUserBadgesByIndex] = useState<
     Record<number, BadgeTriple>
   >({});
+  const [pronunciationProgress, setPronunciationProgress] = useState<{
+    recent: number | null;
+    average: number | null;
+    trend: "up" | "down" | "stable" | null;
+  }>({ recent: null, average: null, trend: null });
   const [bannerVisible, setBannerVisible] = useState<boolean>(true);
   const bannerTimerRef = useRef<number | null>(null);
   const AUTO_HIDE_MS = 12000; // generous timeout (12s)
@@ -107,6 +346,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const lastUserAudioDataUrlRef = useRef<string | null>(null);
   const transcriptMetricsSentRef = useRef<boolean>(false);
   const lastUserMsgIndexRef = useRef<number | null>(null);
+
+  // Carregar histórico de pronúncia quando o componente é montado
+  useEffect(() => {
+    // Buscar progresso inicial de pronúncia
+    const progress = getPronunciationProgress();
+    setPronunciationProgress(progress);
+  }, []);
 
   // Escalation UI state
   const [escalatedIndices, setEscalatedIndices] = useState<number[]>([]);
@@ -575,28 +821,33 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   function showBanner(m: SpeakingMetrics) {
     setSpeakingMetrics(m);
     setBannerVisible(true);
+
+    // Atualizar o progresso de pronúncia
+    const progress = getPronunciationProgress();
+    setPronunciationProgress(progress);
+
     if (bannerTimerRef.current) window.clearTimeout(bannerTimerRef.current);
     bannerTimerRef.current = window.setTimeout(() => {
       setBannerVisible(false);
     }, AUTO_HIDE_MS);
   }
 
-  // ---------------- Badge + Banner helpers ----------------
-  function levelWpmRange(level: EnglishLevel | string | null | undefined): {
-    min: number;
-    max: number;
-  } {
-    const L = String(level ?? "B1").toUpperCase();
-    const map: Record<string, { min: number; max: number }> = {
-      A1: { min: 80, max: 140 },
-      A2: { min: 100, max: 160 },
-      B1: { min: 110, max: 180 },
-      B2: { min: 120, max: 200 },
-      C1: { min: 130, max: 210 },
-      C2: { min: 140, max: 220 },
-    };
-    return map[L] ?? map.B1;
-  }
+// ---------------- Badge + Banner helpers ----------------
+function levelWpmRange(level: EnglishLevel | string | null | undefined): {
+  min: number;
+  max: number;
+} {
+  const L = String(level ?? "B1").toUpperCase();
+  const map: Record<string, { min: number; max: number }> = {
+    A1: { min: 80, max: 140 },
+    A2: { min: 100, max: 160 },
+    B1: { min: 110, max: 180 },
+    B2: { min: 120, max: 200 },
+    C1: { min: 130, max: 210 },
+    C2: { min: 140, max: 220 },
+  };
+  return map[L] ?? map.B1;
+}
 
   function buildBadgesFromMetrics(
     m: SpeakingMetrics,
@@ -689,7 +940,79 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       };
     }
 
-    return { speed, clarity, volume };
+    // Pronúncia badge com análise avançada de pausas e ritmo
+    let pronunciation: Badge | undefined;
+
+    // Obtém análise avançada de pausas e ritmo
+    const rhythmAnalysis = analyzePausesAndRhythm(m, level);
+
+    // Calcula score combinado (70% do pronunciation_score original, 30% do score ajustado por nível)
+    let finalScore: number;
+    let reasons: string[] = [];
+
+    if (typeof m.pronunciation_score === "number") {
+      // Se temos um pronunciation_score do backend
+      finalScore = m.pronunciation_score * 0.7 + rhythmAnalysis.level_adjusted_score * 0.3;
+
+      // Adicionar razões do backend, se disponíveis
+      if (m.pronunciation_reasons && m.pronunciation_reasons.length > 0) {
+        reasons = [...m.pronunciation_reasons];
+      }
+    } else {
+      // Se não temos um pronunciation_score, usamos apenas o score ajustado por nível
+      finalScore = rhythmAnalysis.level_adjusted_score;
+    }
+
+    // Adicionar feedback sobre pausas e ritmo
+    if (rhythmAnalysis.pause_feedback) {
+      reasons.push(rhythmAnalysis.pause_feedback);
+    }
+
+    // Adicionar dicas específicas para problemas de ritmo
+    if (rhythmAnalysis.rhythm_issues.includes("excessive_pauses")) {
+      reasons.push("Try to connect words more smoothly.");
+    }
+    if (rhythmAnalysis.rhythm_issues.includes("long_pauses")) {
+      reasons.push("Practice speaking in complete thoughts without stopping.");
+    }
+    if (rhythmAnalysis.rhythm_issues.includes("short_phrases")) {
+      reasons.push("Try to build longer, connected phrases.");
+    }
+    if (rhythmAnalysis.rhythm_issues.includes("run_on_sentences")) {
+      reasons.push("Add appropriate pauses between complete thoughts.");
+    }
+
+    // Formatar as razões para o tooltip
+    const formattedReasons = reasons.length > 0 ? "\n" + reasons.map(r => `• ${r}`).join("\n") : "";
+
+    // Definir o badge baseado no score combinado
+    if (finalScore >= 80) {
+      pronunciation = {
+        label: "Excellent",
+        tone: "good",
+        tooltip: `Pronúncia: ${Math.round(finalScore)}/100${formattedReasons}`,
+      };
+    } else if (finalScore >= 65) {
+      pronunciation = {
+        label: "Good",
+        tone: "good",
+        tooltip: `Pronúncia: ${Math.round(finalScore)}/100${formattedReasons}`,
+      };
+    } else if (finalScore >= 50) {
+      pronunciation = {
+        label: "Fair",
+        tone: "warn",
+        tooltip: `Pronúncia: ${Math.round(finalScore)}/100${formattedReasons}`,
+      };
+    } else {
+      pronunciation = {
+        label: "Needs Work",
+        tone: "bad",
+        tooltip: `Pronúncia: ${Math.round(finalScore)}/100${formattedReasons}`,
+      };
+    }
+
+    return { speed, clarity, volume, pronunciation };
   }
 
   const Pill: React.FC<{ badge: Badge; name: string }> = ({ badge, name }) => (
@@ -710,8 +1033,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const SpeakingStickyBanner: React.FC<{
     metrics: SpeakingMetrics;
     level: EnglishLevel;
+    pronunciationProgress?: {
+      recent: number | null;
+      average: number | null;
+      trend: "up" | "down" | "stable" | null;
+    };
     onClose?: () => void;
-  }> = ({ metrics, level, onClose }) => {
+  }> = ({ metrics, level, pronunciationProgress, onClose }) => {
     const badges = buildBadgesFromMetrics(metrics, level);
     const friendly = (() => {
       const tips: string[] = [];
@@ -738,7 +1066,14 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             : "Lower input volume to avoid distortion."
         );
       }
-      return tips.length ? tips.join(" ") : "Great pace, clarity, and volume!";
+      if (badges.pronunciation && badges.pronunciation.tone !== "good") {
+        tips.push(
+          badges.pronunciation.label === "Needs Work"
+            ? "Focus on clearer articulation of sounds."
+            : "Pay attention to word stress and intonation."
+        );
+      }
+      return tips.length ? tips.join(" ") : "Great pace, clarity, and pronunciation!";
     })();
 
     const styleBase = metrics.suggested_escalation
@@ -751,11 +1086,23 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           <Pill name="Speed" badge={badges.speed} />
           <Pill name="Clarity" badge={badges.clarity} />
           <Pill name="Volume" badge={badges.volume} />
+          {badges.pronunciation && <Pill name="Pronunciation" badge={badges.pronunciation} />}
+          {pronunciationProgress && pronunciationProgress.recent !== null && (
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-gray-300">Histórico:</span>
+              <PronunciationProgress
+                recent={pronunciationProgress.recent}
+                average={pronunciationProgress.average}
+                trend={pronunciationProgress.trend}
+                showDetails={true}
+              />
+            </div>
+          )}
           <button
             type="button"
             aria-label="Close speaking tips"
             onClick={onClose}
-            className="ml-auto px-2 py-0.5 text-xs rounded-md bg-gray-700/60 hover:bg-gray-600 transition"
+            className="px-2 py-0.5 text-xs rounded-md bg-gray-700/60 hover:bg-gray-600 transition"
           >
             Close
           </button>
@@ -815,6 +1162,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
               <SpeakingStickyBanner
                 metrics={speakingMetrics}
                 level={englishLevel}
+                pronunciationProgress={pronunciationProgress}
                 onClose={() => setBannerVisible(false)}
               />
             ) : null

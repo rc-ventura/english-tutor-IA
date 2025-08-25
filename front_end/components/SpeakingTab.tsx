@@ -658,26 +658,20 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
               audioPlayedRef.current = true;
             }
 
-            // Keep assistant placeholder visible across the user transcription update and until assistant text arrives
+            // Merge server messages, appending an assistant placeholder only
+            // when the backend hasn't produced an assistant bubble yet. This
+            // mirrors the simpler streaming approach used in WritingTab.
             let merged = serverMessages as ChatMessage[];
-            const last = merged[merged.length - 1];
-            const lastIsAssistantPending =
-              !!last &&
-              last.role === "assistant" &&
-              (last.content == null ||
-                (typeof last.content !== "string" &&
-                  !(last as any).text_for_llm));
+            const hasAssistant = merged.some((m) => m.role === "assistant");
             const hasAssistantText = merged.some(
               (m) =>
                 m.role === "assistant" &&
                 (typeof m.content === "string" || (m as any).text_for_llm)
             );
-            const needsAssistantPlaceholder =
-              awaitingAssistantRef.current && !hasAssistantText;
-            if (needsAssistantPlaceholder && !lastIsAssistantPending) {
+            if (!hasAssistant) {
               merged = [...merged, { role: "assistant", content: null }];
             }
-            // Stop awaiting only once assistant textual content appears
+            // Stop awaiting once any assistant text appears
             awaitingAssistantRef.current = !hasAssistantText;
 
             // If transcription text is present, forward it to speaking metrics once

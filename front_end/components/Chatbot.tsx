@@ -70,6 +70,24 @@ const isGradioAudioContent = (
   );
 };
 
+// Extract textual content from a chat message, whether it's a plain string,
+// nested under content.text, or provided via text_for_llm. Exposed for tests.
+export const __TEST_ONLY__ = {
+  getMessageText: null as null | ((m: ChatMessage) => string | null),
+};
+
+const getMessageText = (m: ChatMessage): string | null => {
+  if (typeof m.content === "string") return m.content;
+  if (typeof m.content === "object" && m.content !== null) {
+    const text = (m.content as any).text;
+    if (typeof text === "string") return text;
+  }
+  if (typeof m.text_for_llm === "string") return m.text_for_llm;
+  return null;
+};
+
+__TEST_ONLY__.getMessageText = getMessageText;
+
 // --- Main Components ---
 
 const AudioPlayer: React.FC<{ src: string }> = ({ src }) => {
@@ -93,10 +111,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
   const isUser = message.role === "user";
 
   const handleCopy = () => {
-    const textToCopy =
-      typeof message.content === "string"
-        ? message.content
-        : message.text_for_llm;
+    const textToCopy = getMessageText(message);
     if (textToCopy) {
       navigator.clipboard.writeText(textToCopy);
     }
@@ -123,34 +138,33 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
       // --- Immersive Mode Rendering ---
       if (isGradioAudioContent(message.content) && message.content.file?.url) {
         return <AudioPlayer src={message.content.file.url} />;
-      } else if (typeof message.content === "string") {
+      }
+      const text = getMessageText(message);
+      if (text) {
         return (
-          <div
-            className={message.content.includes("Error") ? "text-red-400" : ""}
-          >
-            {message.content}
-          </div>
-        );
-      } else {
-        // Inline modern placeholder inside the bubble
-        return (
-          <div className="flex items-center gap-2 text-gray-300">
-            <div className="eq-bars" aria-hidden>
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <span>
-              {isUser
-                ? "Transcrevendo sua fala..."
-                : botIsSpeaking
-                ? "Falando..."
-                : "Gerando resposta de voz..."}
-            </span>
-          </div>
+          <div className={text.includes("Error") ? "text-red-400" : ""}>{
+            text
+          }</div>
         );
       }
+      // Inline modern placeholder inside the bubble
+      return (
+        <div className="flex items-center gap-2 text-gray-300">
+          <div className="eq-bars" aria-hidden>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <span>
+            {isUser
+              ? "Transcrevendo sua fala..."
+              : botIsSpeaking
+              ? "Falando..."
+              : "Gerando resposta de voz..."}
+          </span>
+        </div>
+      );
     } else {
       // --- Hybrid Mode Rendering ---
       // Trata mensagens de áudio primeiro
@@ -182,8 +196,9 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         );
       }
 
+      const text = getMessageText(message);
       // Se ainda não há conteúdo de texto (pendente), mostrar placeholder moderno
-      if (typeof message.content !== "string" && !message.text_for_llm) {
+      if (!text) {
         return (
           <div className="flex items-center gap-2 text-gray-300">
             <div className="eq-bars" aria-hidden>
@@ -204,11 +219,6 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
       }
 
       // Mantém o tratamento padrão para mensagens de texto
-      const text =
-        typeof message.content === "string"
-          ? message.content
-          : message.text_for_llm || "";
-      //const normalized = normalizeAssistantText(text);
       return (
         <div className="max-w-3xl whitespace-pre-wrap break-words leading-relaxed chat-markdown">
           <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>

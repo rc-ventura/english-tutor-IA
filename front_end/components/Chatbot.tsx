@@ -24,7 +24,6 @@ export interface BadgeTriple {
   speed: Badge;
   clarity: Badge;
   volume: Badge;
-  pronunciation?: Badge; // Novo badge de pronúncia (opcional para compatibilidade)
 }
 
 // --- Component Props ---
@@ -277,7 +276,6 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
               ["Speed", badges.speed] as const,
               ["Clarity", badges.clarity] as const,
               ["Volume", badges.volume] as const,
-              ...(badges.pronunciation ? [["Pronunciation", badges.pronunciation] as const] : [])
             ].map(([name, b], i) => (
               <span
                 key={`${name}-${i}`}

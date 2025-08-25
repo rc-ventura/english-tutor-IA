@@ -36,8 +36,8 @@ class WritingTutor(BaseTutor):
         self,
         input_data: Optional[str] = None,
         history: Optional[List[Dict[str, Any]]] = None,
-        level: Optional[str] = None,
         writing_type: Optional[str] = None,
+        level: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]], None, None]:
         """Evaluates an essay and streams the feedback into the chat history."""
 

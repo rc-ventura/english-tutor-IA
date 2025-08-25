@@ -96,9 +96,8 @@ class SpeakingTutor(BaseTutor):
         speaking_mode: Optional[str] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]], None, None]:
         """
-        Gets bot response and streams results without blocking.
-        - Always yields audio URL as soon as available (non-blocking).
-        - Streams assistant text progressively with no sleeps; frontend gates display.
+        Gets bot response, yields audio for immediate playback, waits for it to finish,
+        then yields the updated chat history with the bot's text.
         """
         if not self.tutor_parent.openai_service:
             yield gr.Error("No valid OpenAI API key set. Please enter your API key in the settings."), [], None
@@ -329,34 +328,34 @@ class SpeakingTutor(BaseTutor):
                 yield current_history, current_history, audio_path
                 return
 
-            # 1. Yield audio for immediate playback (do not block for duration).
-            _logger.info("Audio-first UX: Yielding audio for playback (non-blocking).")
+            # 1. Yield audio for immediate playback, without updating the chat text.
+            _logger.info("Audio-first UX: Yielding audio for playback.")
             yield current_history, current_history, audio_path
 
-            # 2. Stream the assistant text progressively without sleeps.
-            _logger.info("Audio-first UX: Streaming assistant text without blocking.")
+            # 2. Wait for the audio to finish playing before showing the text.
+            duration = get_audio_duration(audio_path)
+            # Add a small buffer to the wait time
+            wait_time = duration + 0.2
+            _logger.info(f"Audio-first UX: Waiting for {wait_time:.2f}s for audio to play.")
+            time.sleep(wait_time)
+
+            # 3. Now, simulate the streaming of the bot's text.
+            _logger.info("Audio-first UX: Simulating text stream.")
             bot_full_text = bot_text_response
 
-            # Add a message bubble for the assistant to stream into.
+            # Add an empty message bubble for the assistant to stream into.
             current_history.append({"role": "assistant", "content": ""})
 
-            # Chunk by words to reduce number of yields without adding sleeps
-            try:
-                chunk_words = max(1, int(os.getenv("SPEAKING_TEXT_CHUNK_WORDS", "12")))
-            except Exception:
-                chunk_words = 12
-
             words = bot_full_text.split()
-            for i in range(0, len(words), chunk_words):
-                piece = " ".join(words[i : i + chunk_words])
-                # Append with space if needed
-                if current_history[-1]["content"]:
-                    current_history[-1]["content"] += " " + piece
-                else:
-                    current_history[-1]["content"] = piece
+            for i, word in enumerate(words):
+                # Update the content of the last message
+                current_history[-1]["content"] += word + " "
 
-                # Yield the updated state to the UI (no delay)
-                yield current_history, current_history, None
+                # Yield the updated state to the UI
+                yield current_history, current_history, None  # audio_path
+
+                # Control the streaming speed for a natural feel
+                time.sleep(0.05)
 
             # After finishing streaming, update the running summary
             try:

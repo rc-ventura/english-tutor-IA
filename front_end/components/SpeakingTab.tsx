@@ -35,11 +35,6 @@ const API_BASE_URL: string =
   ) ||
   "";
 
-// Stream watchdog timeout (seconds)
-const STREAM_TIMEOUT_SEC: number = Number(
-  (import.meta as any).env?.VITE_SPEAKING_STEP_TIMEOUT_SEC ?? 30
-);
-
 const postSpeakingMetrics = async (payload: {
   userAudioBase64?: string;
   userAudioUrl?: string;
@@ -58,15 +53,6 @@ const postSpeakingMetrics = async (payload: {
 interface SpeakingTabProps {
   englishLevel: EnglishLevel;
 }
-
-// Expor funções internas para testes
-export const __TEST_ONLY__ = {
-  resetWatchdog: null as null | (() => void),
-  streamingJobRef: { current: null as null | (() => void) },
-  setMessages: null as null | React.Dispatch<React.SetStateAction<ChatMessage[]>>,
-  setIsLoading: null as null | React.Dispatch<React.SetStateAction<boolean>>,
-  setBotSpeaking: null as null | React.Dispatch<React.SetStateAction<boolean>>,
-};
 
 const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const ENABLE_ESCALATION =
@@ -100,7 +86,6 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const awaitingAssistantRef = useRef<boolean>(false);
   const [botSpeaking, setBotSpeaking] = useState<boolean>(false);
   const streamingJobRef = useRef<(() => void) | null>(null);
-  const watchdogTimerRef = useRef<number | null>(null);
   // Track last bot audio URL to include in escalation payload if assistant message isn't populated yet
   const lastAudioUrlRef = useRef<string | null>(null);
   // Track last user audio (as data URL) to recompute metrics when transcript arrives
@@ -128,8 +113,6 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
     return () => {
       audioContextRef.current?.close();
       if (streamingJobRef.current) streamingJobRef.current();
-      if (watchdogTimerRef.current)
-        window.clearTimeout(watchdogTimerRef.current);
     };
   }, []);
 
@@ -284,45 +267,6 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
     }
   };
 
-  // ---------- Stream Watchdog ----------
-  const clearWatchdog = () => {
-    if (watchdogTimerRef.current) {
-      window.clearTimeout(watchdogTimerRef.current);
-      watchdogTimerRef.current = null;
-    }
-  };
-
-  const resetWatchdog = () => {
-    clearWatchdog();
-    watchdogTimerRef.current = window.setTimeout(() => {
-      console.warn(
-        `[UX] ⏱️ Stream timed out after ${STREAM_TIMEOUT_SEC}s – cancelling job`
-      );
-      try {
-        if (streamingJobRef.current) streamingJobRef.current();
-      } catch (e) {
-        console.warn("stream cancel threw:", e);
-      }
-      setIsLoading(false);
-      setBotSpeaking(false);
-      awaitingAssistantRef.current = false;
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Connection timed out. Please try again.",
-        },
-      ]);
-    }, STREAM_TIMEOUT_SEC * 1000);
-  };
-
-  // Expor funções para testes
-  __TEST_ONLY__.resetWatchdog = resetWatchdog;
-  __TEST_ONLY__.streamingJobRef = streamingJobRef;
-  __TEST_ONLY__.setMessages = setMessages;
-  __TEST_ONLY__.setIsLoading = setIsLoading;
-  __TEST_ONLY__.setBotSpeaking = setBotSpeaking;
-
   const handleStopRecording = () => {
     if (
       mediaRecorderRef.current &&
@@ -399,7 +343,6 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           practiceMode,
           (data) => {
             // onData callback
-            resetWatchdog();
             const { messages: serverMessages, audioUrl } = data;
             console.debug(
               `[UX] 🟢 onData: messages=${
@@ -485,19 +428,8 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             setIsLoading(false);
             console.debug("[UX] ✅ onData applied to UI (merged)");
           },
-          (err) => {
-            clearWatchdog();
-            handleError(err);
-          }, // onError callback
-          () => {
-            // onComplete callback
-            clearWatchdog();
-            setIsLoading(false);
-            console.debug("[UX] 🏁 stream complete");
-          }
+          handleError // onError callback
         );
-        // Start watchdog as soon as stream starts
-        resetWatchdog();
         // Post initial speaking metrics (without transcript) and attach badges to this user turn
         try {
           const dataUrl = await blobToDataURL(audioBlob);

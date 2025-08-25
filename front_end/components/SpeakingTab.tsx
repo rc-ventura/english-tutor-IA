@@ -116,7 +116,23 @@ export const __TEST_ONLY__ = {
   setMessages: null as null | React.Dispatch<React.SetStateAction<ChatMessage[]>>,
   setIsLoading: null as null | React.Dispatch<React.SetStateAction<boolean>>,
   setBotSpeaking: null as null | React.Dispatch<React.SetStateAction<boolean>>,
+  assistantHasText: null as null | ((msgs: ChatMessage[]) => boolean),
 };
+
+// Detect whether any assistant message already contains textual content
+const assistantHasText = (msgs: ChatMessage[]): boolean =>
+  msgs.some(
+    (m) =>
+      m.role === "assistant" &&
+      ((typeof m.content === "string" && m.content.trim().length > 0) ||
+        (typeof m.content === "object" &&
+          m.content !== null &&
+          typeof (m.content as any).text === "string" &&
+          (m.content as any).text.trim().length > 0) ||
+        typeof m.text_for_llm === "string")
+  );
+
+__TEST_ONLY__.assistantHasText = assistantHasText;
 
 // Alternativa 2: Análise avançada de pausas e ritmo
 function analyzePausesAndRhythm(m: SpeakingMetrics, level: EnglishLevel | string): {
@@ -663,11 +679,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             // mirrors the simpler streaming approach used in WritingTab.
             let merged = serverMessages as ChatMessage[];
             const hasAssistant = merged.some((m) => m.role === "assistant");
-            const hasAssistantText = merged.some(
-              (m) =>
-                m.role === "assistant" &&
-                (typeof m.content === "string" || (m as any).text_for_llm)
-            );
+            const hasAssistantText = assistantHasText(merged);
             if (!hasAssistant) {
               merged = [...merged, { role: "assistant", content: null }];
             }

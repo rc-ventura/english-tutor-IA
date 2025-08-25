@@ -672,11 +672,11 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
                 m.role === "assistant" &&
                 (typeof m.content === "string" || (m as any).text_for_llm)
             );
-              const needsAssistantPlaceholder =
-                awaitingAssistantRef.current || isLoading;
-              if (needsAssistantPlaceholder && !lastIsAssistantPending) {
-                merged = [...merged, { role: "assistant", content: null }];
-              }
+            const needsAssistantPlaceholder =
+              awaitingAssistantRef.current && !hasAssistantText;
+            if (needsAssistantPlaceholder && !lastIsAssistantPending) {
+              merged = [...merged, { role: "assistant", content: null }];
+            }
             // Stop awaiting only once assistant textual content appears
             awaitingAssistantRef.current = !hasAssistantText;
 

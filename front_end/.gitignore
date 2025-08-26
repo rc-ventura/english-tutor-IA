@@ -35,3 +35,7 @@ dist/
 
 # Vite
 .vite
+
+# Metrics
+data/metrics
+data/audio/tmp

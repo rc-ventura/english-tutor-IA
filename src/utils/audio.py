@@ -4,6 +4,7 @@ import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 import os
 import re
+import uuid
 
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
@@ -17,9 +18,26 @@ if not _logger.handlers:
 def save_audio_to_temp_file(audio_bytes: bytes, suffix: str = ".wav") -> str:
     """Saves audio bytes to a temporary file and returns the file path."""
     try:
+        # Prefer a centralized project tmp dir, configurable via env
+        base_dir = os.getenv("AUDIO_TMP_DIR", os.path.join("data", "audio", "tmp"))
+        tmp_path = ""
+        try:
+            if base_dir:
+                os.makedirs(base_dir, exist_ok=True)
+                filename = f"sophia_{uuid.uuid4().hex}{suffix}"
+                tmp_path = os.path.join(base_dir, filename)
+                with open(tmp_path, "wb") as f:
+                    f.write(audio_bytes)
+                _logger.info("Saved temp audio to project dir: %s", tmp_path)
+                return tmp_path
+        except Exception as dir_e:
+            _logger.debug("Project tmp dir save failed (%s). Falling back to system tmp.", dir_e)
+
+        # Fallback to system temp directory
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
+        _logger.info("Saved temp audio to system tmp: %s", tmp_path)
         return tmp_path
     except Exception as e:
         _logger.error(f"Failed to save audio to temporary file: {e}", exc_info=True)
@@ -40,8 +58,13 @@ def extract_text_from_response(response: Any) -> str:
     if isinstance(content, list):
         # Search for the first text block in the content list
         for item in content:
-            if isinstance(item, Dict) and item.get("type") == "text":
-                return item.get("text", "")
+            i_type = getattr(item, "type", None) or (isinstance(item, Dict) and item.get("type"))
+            if i_type in ("text", "output_text"):
+                txt = getattr(item, "text", None)
+                if txt is None and isinstance(item, Dict):
+                    txt = item.get("text")
+                if isinstance(txt, str):
+                    return txt
 
     # Fallback for older or different response structures
     if content is None and hasattr(message, "audio") and hasattr(message.audio, "transcript"):

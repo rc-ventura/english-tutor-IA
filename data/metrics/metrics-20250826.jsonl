@@ -1,0 +1,36 @@
+{"ts": "2025-08-26T02:03:33.468191", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:03:36.178930", "type": "histogram", "name": "transcribe_latency_ms", "value": 2710.323542007245, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:03:36.179894", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T02:03:36.450581", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:03:39.116078", "type": "histogram", "name": "multimodal_latency_ms", "value": 2665.0756250019185, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:03:39.116749", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:03:45.713070", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:03:50.662204", "type": "histogram", "name": "stream_session_ms", "value": 4948.275000031572, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:03:50.663233", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:03:54.208091", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:03:56.371793", "type": "histogram", "name": "transcribe_latency_ms", "value": 2163.2787919952534, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:03:56.372854", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T02:03:56.439178", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:03:59.439568", "type": "histogram", "name": "multimodal_latency_ms", "value": 2999.907874967903, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:03:59.440362", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:03:59.443510", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:04:01.587441", "type": "histogram", "name": "stream_session_ms", "value": 2143.6827090219595, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:04:01.588293", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:06:27.803358", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:06:31.012556", "type": "histogram", "name": "transcribe_latency_ms", "value": 3208.5710419924, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:06:31.014011", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T02:06:31.321705", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:06:34.089062", "type": "histogram", "name": "multimodal_latency_ms", "value": 2766.7694579577073, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:06:34.089900", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:06:45.017304", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:06:47.238254", "type": "histogram", "name": "stream_session_ms", "value": 2219.9506670003757, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:06:47.239035", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:06:54.312884", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:06:58.449782", "type": "histogram", "name": "transcribe_latency_ms", "value": 4136.451667000074, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T02:06:58.450327", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T02:06:58.508701", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:07:01.362639", "type": "histogram", "name": "multimodal_latency_ms", "value": 2853.1743329949677, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:07:01.364552", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T02:07:01.369822", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:07:03.786691", "type": "histogram", "name": "stream_session_ms", "value": 2415.7782910042442, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T02:07:03.787782", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}

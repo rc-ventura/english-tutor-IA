@@ -11,6 +11,7 @@ from src.models.prompts import system_message
 from src.services.openai_service import OpenAIService
 from src.core.progress_tracker import ProgressTracker
 from ui.interfaces import run_gradio_interface
+from src.infra.telemetry import TelemetryService
 
 
 class EnglishTutor:
@@ -21,8 +22,14 @@ class EnglishTutor:
         self.progress_tracker = ProgressTracker()
         self._setup()
 
+        # Initialize telemetry (best-effort)
         try:
-            self.openai_service = OpenAIService(api_key=self.openai_api_key, model=self.model)
+            self.telemetry = TelemetryService(base_dir=os.getenv("TELEMETRY_DIR"))
+        except Exception:
+            self.telemetry = None
+
+        try:
+            self.openai_service = OpenAIService(api_key=self.openai_api_key, model=self.model, telemetry=self.telemetry)
         except ValueError as e:
             logging.warning(f"OpenAIService could not be initialized: {e}. API key might need to be set via UI.")
             self.openai_service = None
@@ -65,7 +72,7 @@ class EnglishTutor:
 
         try:
             self.openai_api_key = api_key
-            self.openai_service = OpenAIService(api_key=self.openai_api_key, model=self.model)
+            self.openai_service = OpenAIService(api_key=self.openai_api_key, model=self.model, telemetry=self.telemetry)
 
             if hasattr(self, "speaking_tutor") and self.speaking_tutor:
                 self.speaking_tutor.openai_service = self.openai_service

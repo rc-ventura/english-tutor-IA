@@ -1,8 +1,9 @@
 import logging
 import os
 import shutil
-from typing import Any, Dict, Generator, List
+from typing import Any, Dict, Generator, List, Optional
 from src.models.prompts import TRANSCRIBE_PROMPT
+from src.infra.telemetry import TelemetryService
 
 from openai import OpenAI, AuthenticationError
 from pydub import AudioSegment
@@ -12,6 +13,13 @@ from openai.types.chat import ChatCompletion
 MULTIMODAL_MODEL = os.getenv("MULTIMODAL_MODEL", "gpt-4o-mini-audio-preview")
 TRANSCRIPTION_MODEL = os.getenv("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
 FALLBACK_TRANSCRIPTION_MODEL = os.getenv("FALLBACK_TRANSCRIPTION_MODEL", "Whisper-1")
+"""
+Audio generation defaults (configurable):
+- AUDIO_VOICE: default voice for multimodal audio output (e.g., alloy, verse)
+- AUDIO_OUTPUT_FORMAT: output container/codec (wav, mp3, etc.)
+"""
+AUDIO_VOICE = os.getenv("AUDIO_VOICE", "alloy")
+AUDIO_OUTPUT_FORMAT = os.getenv("AUDIO_OUTPUT_FORMAT", "wav")
 
 logging.info(
     f"Using models: MULTIMODAL_MODEL={MULTIMODAL_MODEL}, TRANSCRIPTION_MODEL={TRANSCRIPTION_MODEL}, FALLBACK_TRANSCRIPTION_MODEL={FALLBACK_TRANSCRIPTION_MODEL}"
@@ -45,17 +53,18 @@ class OpenAIService:
                 logging.warning(f"API validation error: {e}")
                 return False
 
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini", telemetry: Optional[TelemetryService] = None):
         if not api_key:
             raise ValueError("API key is required for OpenAIService.")
         self.client = OpenAI(api_key=api_key)
         self.model = model
+        self.telemetry = telemetry
 
     def chat_multimodal(
         self,
         messages: List[Dict[str, Any]],
-        voice: str = "alloy",
-        output_format: str = "wav",
+        voice: str = AUDIO_VOICE,
+        output_format: str = AUDIO_OUTPUT_FORMAT,
         temperature: float = 0.7,
         max_tokens: int = 1000,
     ) -> ChatCompletion:
@@ -67,17 +76,51 @@ class OpenAIService:
             logging.error("'messages' must be a non-empty list.")
             raise ValueError("Messages list cannot be empty for chat_multimodal")
 
-        logging.info(f"Sending {len(messages)} messages to multimodal model {MULTIMODAL_MODEL}.")
-
-        response = self.client.chat.completions.create(
-            model=MULTIMODAL_MODEL,
-            modalities=["text", "audio"],
-            audio={"voice": voice, "format": output_format},
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
+        logging.info(
+            f"Sending {len(messages)} messages to multimodal model {MULTIMODAL_MODEL} (voice={voice}, format={output_format})."
         )
-        return response
+
+        if self.telemetry:
+            self.telemetry.inc_counter(
+                "audio_attempts_total",
+                {"model": MULTIMODAL_MODEL, "voice": voice, "format": output_format},
+            )
+        try:
+            if self.telemetry:
+                with self.telemetry.timeit(
+                    "multimodal_latency_ms",
+                    {"model": MULTIMODAL_MODEL, "voice": voice, "format": output_format},
+                ):
+                    response = self.client.chat.completions.create(
+                        model=MULTIMODAL_MODEL,
+                        modalities=["text", "audio"],
+                        audio={"voice": voice, "format": output_format},
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
+            else:
+                response = self.client.chat.completions.create(
+                    model=MULTIMODAL_MODEL,
+                    modalities=["text", "audio"],
+                    audio={"voice": voice, "format": output_format},
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            if self.telemetry:
+                self.telemetry.inc_counter(
+                    "audio_success_total",
+                    {"model": MULTIMODAL_MODEL, "voice": voice, "format": output_format},
+                )
+            return response
+        except Exception as e:
+            if self.telemetry:
+                self.telemetry.inc_counter(
+                    "audio_error_total",
+                    {"model": MULTIMODAL_MODEL, "voice": voice, "format": output_format, "error": type(e).__name__},
+                )
+            raise
 
     def stream_chat_completion(
         self,
@@ -87,18 +130,37 @@ class OpenAIService:
     ) -> Generator[str, None, None]:
         """Stream chat completion tokens one by one."""
         logging.info(f"Requesting streaming chat completion with model {self.model}.")
+        if self.telemetry:
+            self.telemetry.inc_counter("stream_started_total", {"model": self.model})
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-            )
-            for chunk in response:
-                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+            if self.telemetry:
+                with self.telemetry.timeit("stream_session_ms", {"model": self.model}):
+                    response = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=True,
+                    )
+                    for chunk in response:
+                        if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                            yield chunk.choices[0].delta.content
+            else:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                )
+                for chunk in response:
+                    if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+            if self.telemetry:
+                self.telemetry.inc_counter("stream_completed_total", {"model": self.model})
         except Exception as e:
+            if self.telemetry:
+                self.telemetry.inc_counter("stream_error_total", {"model": self.model, "error": type(e).__name__})
             logging.error(f"Error during multimodal chat: {e}", exc_info=True)
             raise
 
@@ -108,15 +170,31 @@ class OpenAIService:
             logging.error("OpenAI client is not initialized. Cannot perform text-to-speech.")
             raise ConnectionError("OpenAI client not initialized. Please set a valid API key.")
 
+        if self.telemetry:
+            self.telemetry.inc_counter("tts_attempts_total", {"model": model, "voice": voice})
         try:
-            response = self.client.audio.speech.create(
-                model=model,
-                voice=voice,
-                input=text,
-            )
+            if self.telemetry:
+                with self.telemetry.timeit("tts_latency_ms", {"model": model, "voice": voice}):
+                    response = self.client.audio.speech.create(
+                        model=model,
+                        voice=voice,
+                        input=text,
+                    )
+            else:
+                response = self.client.audio.speech.create(
+                    model=model,
+                    voice=voice,
+                    input=text,
+                )
+            if self.telemetry:
+                self.telemetry.inc_counter("tts_success_total", {"model": model, "voice": voice})
             # The response contains the audio data directly.
             return response.content
         except Exception as e:
+            if self.telemetry:
+                self.telemetry.inc_counter(
+                    "tts_error_total", {"model": model, "voice": voice, "error": type(e).__name__}
+                )
             logging.error(f"Error during text-to-speech generation: {e}", exc_info=True)
             raise
 
@@ -169,13 +247,34 @@ class OpenAIService:
                 raise ValueError("Unexpected transcription response type; no text found.")
 
             try:
-                text = _do_transcribe(TRANSCRIPTION_MODEL)
+                if self.telemetry:
+                    self.telemetry.inc_counter("transcribe_attempts_total", {"model": TRANSCRIPTION_MODEL})
+                if self.telemetry:
+                    with self.telemetry.timeit("transcribe_latency_ms", {"model": TRANSCRIPTION_MODEL}):
+                        text = _do_transcribe(TRANSCRIPTION_MODEL)
+                else:
+                    text = _do_transcribe(TRANSCRIPTION_MODEL)
             except Exception as primary_err:
                 logging.error(f"Primary transcription failed ({TRANSCRIPTION_MODEL}): {primary_err}", exc_info=True)
+                if self.telemetry:
+                    self.telemetry.inc_counter(
+                        "transcribe_error_total", {"model": TRANSCRIPTION_MODEL, "error": type(primary_err).__name__}
+                    )
                 logging.info(f"Falling back to {FALLBACK_TRANSCRIPTION_MODEL}...")
-                text = _do_transcribe(FALLBACK_TRANSCRIPTION_MODEL)
+                if self.telemetry:
+                    self.telemetry.inc_counter("transcribe_attempts_total", {"model": FALLBACK_TRANSCRIPTION_MODEL})
+                if self.telemetry:
+                    with self.telemetry.timeit("transcribe_latency_ms", {"model": FALLBACK_TRANSCRIPTION_MODEL}):
+                        text = _do_transcribe(FALLBACK_TRANSCRIPTION_MODEL)
+                else:
+                    text = _do_transcribe(FALLBACK_TRANSCRIPTION_MODEL)
 
             logging.info("Audio transcribed successfully.")
+            if self.telemetry:
+                self.telemetry.inc_counter(
+                    "transcribe_success_total",
+                    {"primary_model": TRANSCRIPTION_MODEL, "fallback_model": FALLBACK_TRANSCRIPTION_MODEL},
+                )
             return text
 
         except Exception as e:

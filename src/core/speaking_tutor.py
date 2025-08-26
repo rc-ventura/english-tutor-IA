@@ -207,7 +207,7 @@ class SpeakingTutor(BaseTutor):
             while attempts < max_retries and not audio_base64_data:
                 try:
                     response = self.tutor_parent.openai_service.chat_multimodal(
-                        messages=messages_for_llm, voice="alloy", max_tokens=max_tokens
+                        messages=messages_for_llm, max_tokens=max_tokens
                     )
                     bot_text_response = extract_text_from_response(response)
                     _logger.info(f"LLM text length: {len(bot_text_response)} chars")
@@ -310,7 +310,10 @@ class SpeakingTutor(BaseTutor):
 
             # --- Audio-First UX Implementation ---
             audio_bytes = base64.b64decode(audio_base64_data)
-            audio_path = save_audio_to_temp_file(audio_bytes)
+            # Respect configured output format for file suffix
+            audio_fmt = os.getenv("AUDIO_OUTPUT_FORMAT", "wav").strip().lower() or "wav"
+            suffix = f".{audio_fmt}" if not audio_fmt.startswith(".") else audio_fmt
+            audio_path = save_audio_to_temp_file(audio_bytes, suffix=suffix)
 
             if speaking_mode == "Immersive":
                 # In immersive mode, just add the audio player to the chat

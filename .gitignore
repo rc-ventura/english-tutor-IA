@@ -191,3 +191,7 @@ cython_debug/
 #user_data
 /user_data
 
+
+#front_end
+/front_end/data/metrics/*
+/front_end/data/audio/*

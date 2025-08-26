@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import os
 import re
 import uuid
+from src.infra.temp_audio_manager import maintain_tmp_audio_dir
 
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
@@ -29,6 +30,11 @@ def save_audio_to_temp_file(audio_bytes: bytes, suffix: str = ".wav") -> str:
                 with open(tmp_path, "wb") as f:
                     f.write(audio_bytes)
                 _logger.info("Saved temp audio to project dir: %s", tmp_path)
+                # Best-effort maintenance of tmp dir (age/size/count)
+                try:
+                    maintain_tmp_audio_dir(base_dir=base_dir)
+                except Exception as maint_e:
+                    _logger.debug("TempAudioManager maintenance skipped: %s", maint_e)
                 return tmp_path
         except Exception as dir_e:
             _logger.debug("Project tmp dir save failed (%s). Falling back to system tmp.", dir_e)
@@ -38,6 +44,11 @@ def save_audio_to_temp_file(audio_bytes: bytes, suffix: str = ".wav") -> str:
             tmp_file.write(audio_bytes)
             tmp_path = tmp_file.name
         _logger.info("Saved temp audio to system tmp: %s", tmp_path)
+        # Best-effort maintenance for the directory we used
+        try:
+            maintain_tmp_audio_dir(base_dir=os.path.dirname(tmp_path))
+        except Exception as maint_e:
+            _logger.debug("TempAudioManager maintenance (system tmp) skipped: %s", maint_e)
         return tmp_path
     except Exception as e:
         _logger.error(f"Failed to save audio to temporary file: {e}", exc_info=True)

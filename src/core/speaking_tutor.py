@@ -35,7 +35,7 @@ class SpeakingTutor(BaseTutor):
             f"SpeakingTutor.process_input (synchronous): Start. audio_file_path='{input_data}', level='{level}'"
         )
 
-        updated_history = self.handle_transcription(audio_file_path=input_data, history=history)
+        updated_history = self.handle_transcription(audio_filepath=input_data, history=history)
 
         final_history = self.handle_bot_response(history=updated_history, level=level)
 

@@ -2,6 +2,8 @@ import base64
 import logging
 import time
 import os
+import threading
+import queue
 import gradio as gr
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
@@ -268,9 +270,74 @@ class SpeakingTutor(BaseTutor):
                         service=self.tutor_parent.openai_service,
                         telemetry=getattr(self.tutor_parent, "telemetry", None),
                     )
-                    bot_text_response = sm.stream_text(
-                        messages=messages_for_llm, temperature=0.6, max_tokens=max_tokens
-                    )
+                    # Stream to UI incrementally using callbacks + queue
+                    q: "queue.Queue" = queue.Queue()
+                    acc: List[str] = []
+                    done_flag = {"done": False}
+
+                    def on_chunk(ch: str) -> None:
+                        q.put(("data", ch))
+
+                    def on_complete(txt: str) -> None:
+                        q.put(("done", txt))
+
+                    def on_error(e: Exception) -> None:
+                        q.put(("error", e))
+
+                    def worker() -> None:
+                        try:
+                            _ = sm.stream_text(
+                                messages=messages_for_llm,
+                                temperature=0.6,
+                                max_tokens=max_tokens,
+                                on_chunk=on_chunk,
+                                on_complete=on_complete,
+                                on_error=on_error,
+                            )
+                        except Exception as _:
+                            # Error already reported via on_error
+                            pass
+
+                    t = threading.Thread(target=worker, daemon=True)
+                    t.start()
+
+                    # Prepare an empty assistant message to receive streamed chunks
+                    current_history.append({"role": "assistant", "content": ""})
+
+                    while True:
+                        try:
+                            kind, payload = q.get(timeout=0.1)
+                        except queue.Empty:
+                            # keep UI responsive while waiting
+                            if done_flag["done"]:
+                                break
+                            # Yield current state even without new chunks to let UI refresh
+                            yield current_history, current_history, None
+                            continue
+
+                        if kind == "data":
+                            ch = payload
+                            acc.append(ch)
+                            current_history[-1]["content"] += ch
+                            # Yield after each chunk
+                            yield current_history, current_history, None
+                        elif kind == "done":
+                            done_flag["done"] = True
+                            bot_text_response = payload or ""  # full text
+                            break
+                        elif kind == "error":
+                            err = payload
+                            _logger.error("Text-only streaming error: %s", err)
+                            # Show partial text if any, then append error note
+                            if acc:
+                                yield current_history, current_history, None
+                            current_history.append({"role": "assistant", "content": "(streaming error)"})
+                            yield current_history, current_history, None
+                            bot_text_response = "".join(acc)
+                            break
+
+                    # Ensure worker finished
+                    t.join(timeout=0.1)
                     _logger.info("Text-only fallback produced %d chars.", len(bot_text_response))
                 except Exception as e:
                     _logger.error("Text-only fallback failed: %s", e, exc_info=True)

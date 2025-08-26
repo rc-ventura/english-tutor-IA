@@ -161,6 +161,60 @@ def test_stream_timeout_then_retry_success():
     # We should have recorded at least one timeout event and one error counter
     timeout_events = [e for e in tel.events if e["name"] == "stream_manager_timeout"]
     assert len(timeout_events) >= 1
+
+
+def test_callbacks_invoked_in_order():
+    class ServiceTokens:
+        model = "gpt-4o-mini"
+
+        def stream_chat_completion(self, messages, temperature, max_tokens):
+            def gen():
+                yield "a"
+                time.sleep(0.005)
+                yield "b"
+                time.sleep(0.005)
+                yield "c"
+
+            return gen()
+
+    tel = StubTelemetry()
+    sm = StreamingManager(service=ServiceTokens(), telemetry=tel, retry_limit=1, backoff_ms=0, heartbeat_ms=1)
+
+    chunks: List[str] = []
+    completed: List[str] = []
+
+    out = sm.stream_text(
+        messages=[{"role": "user", "content": "hi"}],
+        temperature=0.6,
+        max_tokens=16,
+        on_chunk=lambda ch: chunks.append(ch),
+        on_complete=lambda txt: completed.append(txt),
+    )
+
+    assert out == "abc"
+    assert chunks == ["a", "b", "c"]
+    assert completed == ["abc"]
+
+
+def test_on_error_callback_called():
+    class ServiceRaises:
+        model = "gpt-4o-mini"
+
+        def stream_chat_completion(self, messages, temperature, max_tokens):
+            raise RuntimeError("boom")
+
+    tel = StubTelemetry()
+    sm = StreamingManager(service=ServiceRaises(), telemetry=tel, retry_limit=1, backoff_ms=0)
+
+    seen_errors: List[Exception] = []
+    with pytest.raises(RuntimeError):
+        _ = sm.stream_text(
+            messages=[{"role": "user", "content": "hi"}],
+            temperature=0.6,
+            max_tokens=16,
+            on_error=lambda e: seen_errors.append(e),
+        )
+    assert len(seen_errors) == 1
     errors = [c for c in tel.counters if c["name"] == "stream_manager_error_total"]
     assert len(errors) >= 1
 

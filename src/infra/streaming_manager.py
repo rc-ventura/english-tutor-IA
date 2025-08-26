@@ -3,7 +3,7 @@ import time
 import logging
 import threading
 import queue
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 from src.infra.telemetry import TelemetryService
 from src.services.openai_service import OpenAIService
@@ -52,6 +52,9 @@ class StreamingManager:
         messages: List[Dict[str, Any]],
         temperature: float = 0.7,
         max_tokens: int = 1000,
+        on_chunk: Optional[Callable[[str], None]] = None,
+        on_complete: Optional[Callable[[str], None]] = None,
+        on_error: Optional[Callable[[Exception], None]] = None,
     ) -> str:
         if self.telemetry:
             self.telemetry.inc_counter(
@@ -97,6 +100,11 @@ class StreamingManager:
                             ch = payload
                             if ch:
                                 pieces.append(ch)
+                                if on_chunk:
+                                    try:
+                                        on_chunk(ch)
+                                    except Exception as cb_e:  # pragma: no cover (defensive)
+                                        _logger.debug("on_chunk callback raised: %s", cb_e)
                             now = time.perf_counter()
                             if (now - last_hb) * 1000.0 >= self.heartbeat_ms:
                                 if self.telemetry:
@@ -113,6 +121,11 @@ class StreamingManager:
                     for ch in chunks:
                         if ch:
                             pieces.append(ch)
+                            if on_chunk:
+                                try:
+                                    on_chunk(ch)
+                                except Exception as cb_e:  # pragma: no cover (defensive)
+                                    _logger.debug("on_chunk callback raised: %s", cb_e)
                         # heartbeat based on elapsed time
                         now = time.perf_counter()
                         if (now - last_hb) * 1000.0 >= self.heartbeat_ms:
@@ -127,6 +140,11 @@ class StreamingManager:
                 if out:
                     if self.telemetry:
                         self.telemetry.inc_counter("stream_manager_completed_total", {"attempts": attempts})
+                    if on_complete:
+                        try:
+                            on_complete(out)
+                        except Exception as cb_e:  # pragma: no cover (defensive)
+                            _logger.debug("on_complete callback raised: %s", cb_e)
                     return out
                 # If empty, consider retry (could be rate limited or filtered)
                 _logger.info("Streaming produced empty output (attempt %d). Will retry if attempts remain.", attempts)
@@ -140,6 +158,11 @@ class StreamingManager:
                     self.telemetry.inc_counter(
                         "stream_manager_error_total", {"attempt": attempts, "error": type(e).__name__}
                     )
+                if on_error:
+                    try:
+                        on_error(e)
+                    except Exception as cb_e:  # pragma: no cover (defensive)
+                        _logger.debug("on_error callback raised: %s", cb_e)
                 if attempts < self.retry_limit and backoff > 0:
                     time.sleep(backoff * (2 ** (attempts - 1)))
                 continue

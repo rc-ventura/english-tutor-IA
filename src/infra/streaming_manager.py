@@ -1,6 +1,8 @@
 import os
 import time
 import logging
+import threading
+import queue
 from typing import Any, Dict, List, Optional
 
 from src.infra.telemetry import TelemetryService
@@ -26,12 +28,24 @@ class StreamingManager:
         retry_limit: Optional[int] = None,
         backoff_ms: Optional[int] = None,
         heartbeat_ms: Optional[int] = None,
+        timeout_ms: Optional[int] = None,
     ) -> None:
         self.service = service
         self.telemetry = telemetry
         self.retry_limit = int(os.getenv("STREAM_RETRY_LIMIT", str(retry_limit or 2)))
         self.backoff_ms = int(os.getenv("STREAM_RETRY_BACKOFF_MS", str(backoff_ms or 500)))
         self.heartbeat_ms = int(os.getenv("STREAM_HEARTBEAT_MS", str(heartbeat_ms or 1000)))
+        self.timeout_ms = int(os.getenv("STREAM_TIMEOUT_MS", str(timeout_ms or 0)))
+
+    def _consume_in_thread(self, iterator, out_queue: "queue.Queue", stop_event: threading.Event) -> None:
+        try:
+            for item in iterator:
+                if stop_event.is_set():
+                    break
+                out_queue.put(("data", item))
+            out_queue.put(("end", None))
+        except Exception as e:
+            out_queue.put(("error", e))
 
     def stream_text(
         self,
@@ -58,18 +72,57 @@ class StreamingManager:
                 )
                 pieces: List[str] = []
                 last_hb = time.perf_counter()
-                for ch in chunks:
-                    if ch:
-                        pieces.append(ch)
-                    # heartbeat based on elapsed time
-                    now = time.perf_counter()
-                    if (now - last_hb) * 1000.0 >= self.heartbeat_ms:
-                        if self.telemetry:
-                            self.telemetry.log_event(
-                                "stream_manager_heartbeat",
-                                {"attempt": attempts, "received_chars": sum(len(p) for p in pieces)},
-                            )
-                        last_hb = now
+
+                if self.timeout_ms > 0:
+                    inactivity = max(0.001, self.timeout_ms / 1000.0)
+                    q: "queue.Queue" = queue.Queue()
+                    stop_event = threading.Event()
+                    t = threading.Thread(target=self._consume_in_thread, args=(chunks, q, stop_event), daemon=True)
+                    t.start()
+
+                    while True:
+                        try:
+                            kind, payload = q.get(timeout=inactivity)
+                        except queue.Empty:
+                            # inactivity timeout
+                            if self.telemetry:
+                                self.telemetry.log_event(
+                                    "stream_manager_timeout",
+                                    {"attempt": attempts, "received_chars": sum(len(p) for p in pieces)},
+                                )
+                            stop_event.set()
+                            raise TimeoutError("Streaming inactivity timeout")
+
+                        if kind == "data":
+                            ch = payload
+                            if ch:
+                                pieces.append(ch)
+                            now = time.perf_counter()
+                            if (now - last_hb) * 1000.0 >= self.heartbeat_ms:
+                                if self.telemetry:
+                                    self.telemetry.log_event(
+                                        "stream_manager_heartbeat",
+                                        {"attempt": attempts, "received_chars": sum(len(p) for p in pieces)},
+                                    )
+                                last_hb = now
+                        elif kind == "end":
+                            break
+                        elif kind == "error":
+                            raise payload
+                else:
+                    for ch in chunks:
+                        if ch:
+                            pieces.append(ch)
+                        # heartbeat based on elapsed time
+                        now = time.perf_counter()
+                        if (now - last_hb) * 1000.0 >= self.heartbeat_ms:
+                            if self.telemetry:
+                                self.telemetry.log_event(
+                                    "stream_manager_heartbeat",
+                                    {"attempt": attempts, "received_chars": sum(len(p) for p in pieces)},
+                                )
+                            last_hb = now
+
                 out = "".join(pieces).strip()
                 if out:
                     if self.telemetry:

@@ -128,3 +128,61 @@ def test_heartbeat_emitted():
     assert out == "xyz"
     hb = [e for e in tel.events if e["name"] == "stream_manager_heartbeat"]
     assert len(hb) >= 1
+
+
+def test_stream_timeout_then_retry_success():
+    class ServiceTimeoutThenOK:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        model = "gpt-4o-mini"
+
+        def stream_chat_completion(self, messages, temperature, max_tokens):
+            self.calls += 1
+
+            if self.calls == 1:
+                # First attempt: emit one token then stall beyond timeout
+                def gen():
+                    yield "x"
+                    time.sleep(0.05)  # 50ms
+                    yield "y"
+
+                return gen()
+
+            # Second attempt: quick success
+            return iter(["ok"])
+
+    tel = StubTelemetry()
+    sm = StreamingManager(
+        service=ServiceTimeoutThenOK(), telemetry=tel, retry_limit=2, backoff_ms=0, heartbeat_ms=5, timeout_ms=10
+    )
+    out = sm.stream_text(messages=[{"role": "user", "content": "hi"}], temperature=0.6, max_tokens=32)
+    assert out == "ok"
+    # We should have recorded at least one timeout event and one error counter
+    timeout_events = [e for e in tel.events if e["name"] == "stream_manager_timeout"]
+    assert len(timeout_events) >= 1
+    errors = [c for c in tel.counters if c["name"] == "stream_manager_error_total"]
+    assert len(errors) >= 1
+
+
+def test_stream_timeout_exhausts_and_raises():
+    class ServiceAlwaysTimeout:
+        model = "gpt-4o-mini"
+
+        def stream_chat_completion(self, messages, temperature, max_tokens):
+            # Always stall beyond timeout
+            def gen():
+                yield "a"
+                time.sleep(0.05)
+                yield "b"
+
+            return gen()
+
+    tel = StubTelemetry()
+    sm = StreamingManager(
+        service=ServiceAlwaysTimeout(), telemetry=tel, retry_limit=1, backoff_ms=0, heartbeat_ms=5, timeout_ms=10
+    )
+    with pytest.raises(TimeoutError):
+        _ = sm.stream_text(messages=[{"role": "user", "content": "hi"}], temperature=0.6, max_tokens=32)
+    timeout_events = [e for e in tel.events if e["name"] == "stream_manager_timeout"]
+    assert len(timeout_events) >= 1

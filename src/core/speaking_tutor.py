@@ -12,6 +12,7 @@ from src.utils.audio import (
     get_audio_duration,
     save_audio_to_temp_file,
 )
+from src.infra.streaming_manager import StreamingManager
 
 _logger = logging.getLogger(__name__)
 if not _logger.handlers:
@@ -262,10 +263,14 @@ class SpeakingTutor(BaseTutor):
             if not bot_text_response:
                 _logger.warning("Multimodal returned no text; attempting text-only fallback.")
                 try:
-                    chunks = self.tutor_parent.openai_service.stream_chat_completion(
+                    # Use StreamingManager for robust text-only fallback with retries/backoff
+                    sm = StreamingManager(
+                        service=self.tutor_parent.openai_service,
+                        telemetry=getattr(self.tutor_parent, "telemetry", None),
+                    )
+                    bot_text_response = sm.stream_text(
                         messages=messages_for_llm, temperature=0.6, max_tokens=max_tokens
                     )
-                    bot_text_response = "".join(chunks).strip()
                     _logger.info("Text-only fallback produced %d chars.", len(bot_text_response))
                 except Exception as e:
                     _logger.error("Text-only fallback failed: %s", e, exc_info=True)

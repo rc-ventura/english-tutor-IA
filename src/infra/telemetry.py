@@ -3,7 +3,7 @@ import os
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -51,7 +51,7 @@ class TelemetryService:
             self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def _file_for_today(self) -> Path:
-        today = datetime.utcnow().strftime("%Y%m%d")
+        today = datetime.now(UTC).strftime("%Y%m%d")
         return self.base_dir / f"metrics-{today}.jsonl"
 
     def _write_jsonl(self, payload: Dict[str, Any]) -> None:
@@ -64,17 +64,17 @@ class TelemetryService:
             pass
 
     def inc_counter(self, name: str, labels: Optional[Dict[str, Any]] = None) -> None:
-        evt = TelemetryEvent(ts=datetime.utcnow().isoformat(), type="counter", name=name, labels=labels or {})
+        evt = TelemetryEvent(ts=datetime.now(UTC).isoformat(), type="counter", name=name, labels=labels or {})
         self._write_jsonl(evt.to_dict())
 
     def observe_hist(self, name: str, value: float, labels: Optional[Dict[str, Any]] = None) -> None:
         evt = TelemetryEvent(
-            ts=datetime.utcnow().isoformat(), type="histogram", name=name, value=float(value), labels=labels or {}
+            ts=datetime.now(UTC).isoformat(), type="histogram", name=name, value=float(value), labels=labels or {}
         )
         self._write_jsonl(evt.to_dict())
 
     def log_event(self, name: str, labels: Optional[Dict[str, Any]] = None) -> None:
-        evt = TelemetryEvent(ts=datetime.utcnow().isoformat(), type="event", name=name, labels=labels or {})
+        evt = TelemetryEvent(ts=datetime.now(UTC).isoformat(), type="event", name=name, labels=labels or {})
         self._write_jsonl(evt.to_dict())
 
     @contextmanager

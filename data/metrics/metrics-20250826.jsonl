@@ -34,3 +34,39 @@
 {"ts": "2025-08-26T02:07:01.369822", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
 {"ts": "2025-08-26T02:07:03.786691", "type": "histogram", "name": "stream_session_ms", "value": 2415.7782910042442, "labels": {"model": "gpt-4o-mini"}}
 {"ts": "2025-08-26T02:07:03.787782", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T21:41:35.624333", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T21:41:37.691696", "type": "histogram", "name": "transcribe_latency_ms", "value": 2066.82612500299, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T21:41:37.692254", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T21:41:37.893152", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T21:41:40.545595", "type": "histogram", "name": "multimodal_latency_ms", "value": 2652.1790829974634, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T21:41:40.546665", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T21:41:47.170874", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T21:41:49.938720", "type": "histogram", "name": "stream_session_ms", "value": 2766.4724169990222, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T21:41:49.940294", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T21:42:32.704328", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T21:42:34.896330", "type": "histogram", "name": "transcribe_latency_ms", "value": 2191.712208001263, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T21:42:34.897247", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T21:42:35.086430", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T21:42:37.133396", "type": "histogram", "name": "multimodal_latency_ms", "value": 2046.6391670015582, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T21:42:37.134569", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T21:42:37.139246", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T21:42:39.558368", "type": "histogram", "name": "stream_session_ms", "value": 2418.672167001205, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T21:42:39.560475", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T22:46:25.746130", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T22:46:27.713628", "type": "histogram", "name": "transcribe_latency_ms", "value": 1964.6654579992173, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T22:46:27.715148", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T22:46:27.938044", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T22:46:30.522688", "type": "histogram", "name": "multimodal_latency_ms", "value": 2584.22158400208, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T22:46:30.523786", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T22:46:36.694562", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T22:46:38.652538", "type": "histogram", "name": "stream_session_ms", "value": 1956.9030839993502, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T22:46:38.652910", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T22:46:50.602727", "type": "counter", "name": "transcribe_attempts_total", "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T22:46:54.763349", "type": "histogram", "name": "transcribe_latency_ms", "value": 4160.246374998678, "labels": {"model": "gpt-4o-mini-transcribe"}}
+{"ts": "2025-08-26T22:46:54.764758", "type": "counter", "name": "transcribe_success_total", "labels": {"primary_model": "gpt-4o-mini-transcribe", "fallback_model": "Whisper-1"}}
+{"ts": "2025-08-26T22:46:55.112563", "type": "counter", "name": "audio_attempts_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T22:46:57.305943", "type": "histogram", "name": "multimodal_latency_ms", "value": 2193.165083997883, "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T22:46:57.306400", "type": "counter", "name": "audio_success_total", "labels": {"model": "gpt-4o-mini-audio-preview", "voice": "alloy", "format": "wav"}}
+{"ts": "2025-08-26T22:46:57.308024", "type": "counter", "name": "stream_started_total", "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T22:46:59.662968", "type": "histogram", "name": "stream_session_ms", "value": 2354.8335419982322, "labels": {"model": "gpt-4o-mini"}}
+{"ts": "2025-08-26T22:46:59.664297", "type": "counter", "name": "stream_completed_total", "labels": {"model": "gpt-4o-mini"}}

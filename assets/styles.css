@@ -136,6 +136,7 @@ body,
 
 .svelte-1xp0cw7 {
   max-width: 1200px;
+  justify-content: center;
 }
 
 .svelte-vt1mxs {
@@ -185,11 +186,12 @@ body,
   width: 50%;
 }
 
+
 #component-10 {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  width: 40%;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
   margin-left: 1rem;
@@ -403,3 +405,5 @@ body,
     margin-top: 12px;
   }
 }
+
+/* (removed) Streaming Stop Button styles - backend/FE handle cancel */

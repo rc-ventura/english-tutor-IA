@@ -1,4 +1,5 @@
 import time
+import threading
 from typing import Any, Dict, Generator, List, Optional
 
 import pytest
@@ -194,6 +195,45 @@ def test_callbacks_invoked_in_order():
     assert out == "abc"
     assert chunks == ["a", "b", "c"]
     assert completed == ["abc"]
+
+
+def test_stream_cancellation_returns_partial_and_emits_counter():
+    class ServiceTokens:
+        model = "gpt-4o-mini"
+
+        def stream_chat_completion(self, messages, temperature, max_tokens):
+            def gen():
+                yield "A"
+                yield "B"
+                yield "C"
+
+            return gen()
+
+    tel = StubTelemetry()
+    sm = StreamingManager(service=ServiceTokens(), telemetry=tel, retry_limit=1, backoff_ms=0)
+
+    stop = threading.Event()
+    seen: List[str] = []
+
+    def on_chunk(ch: str) -> None:
+        seen.append(ch)
+        if len(seen) == 2:  # cancel after receiving two chunks
+            stop.set()
+
+    out = sm.stream_text(
+        messages=[{"role": "user", "content": "hi"}],
+        temperature=0.6,
+        max_tokens=16,
+        on_chunk=on_chunk,
+        stop_event=stop,
+    )
+
+    assert out == "AB"
+    assert seen == ["A", "B"]
+    names = [c["name"] for c in tel.counters]
+    assert "stream_manager_cancelled_total" in names
+    # Should not be marked completed when cancelled
+    assert "stream_manager_completed_total" not in names
 
 
 def test_on_error_callback_called():

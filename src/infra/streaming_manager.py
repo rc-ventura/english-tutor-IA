@@ -55,6 +55,7 @@ class StreamingManager:
         on_chunk: Optional[Callable[[str], None]] = None,
         on_complete: Optional[Callable[[str], None]] = None,
         on_error: Optional[Callable[[Exception], None]] = None,
+        stop_event: Optional[threading.Event] = None,
     ) -> str:
         if self.telemetry:
             self.telemetry.inc_counter(
@@ -75,15 +76,21 @@ class StreamingManager:
                 )
                 pieces: List[str] = []
                 last_hb = time.perf_counter()
+                cancelled = False
 
                 if self.timeout_ms > 0:
                     inactivity = max(0.001, self.timeout_ms / 1000.0)
                     q: "queue.Queue" = queue.Queue()
-                    stop_event = threading.Event()
-                    t = threading.Thread(target=self._consume_in_thread, args=(chunks, q, stop_event), daemon=True)
+                    local_stop = stop_event or threading.Event()
+                    t = threading.Thread(target=self._consume_in_thread, args=(chunks, q, local_stop), daemon=True)
                     t.start()
 
                     while True:
+                        # Cooperative cancellation
+                        if stop_event is not None and stop_event.is_set():
+                            cancelled = True
+                            local_stop.set()
+                            break
                         try:
                             kind, payload = q.get(timeout=inactivity)
                         except queue.Empty:
@@ -93,7 +100,7 @@ class StreamingManager:
                                     "stream_manager_timeout",
                                     {"attempt": attempts, "received_chars": sum(len(p) for p in pieces)},
                                 )
-                            stop_event.set()
+                            local_stop.set()
                             raise TimeoutError("Streaming inactivity timeout")
 
                         if kind == "data":
@@ -119,6 +126,10 @@ class StreamingManager:
                             raise payload
                 else:
                     for ch in chunks:
+                        # Cooperative cancellation
+                        if stop_event is not None and stop_event.is_set():
+                            cancelled = True
+                            break
                         if ch:
                             pieces.append(ch)
                             if on_chunk:
@@ -137,6 +148,10 @@ class StreamingManager:
                             last_hb = now
 
                 out = "".join(pieces).strip()
+                if cancelled:
+                    if self.telemetry:
+                        self.telemetry.inc_counter("stream_manager_cancelled_total", {"attempt": attempts})
+                    return out
                 if out:
                     if self.telemetry:
                         self.telemetry.inc_counter("stream_manager_completed_total", {"attempts": attempts})

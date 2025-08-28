@@ -97,6 +97,7 @@ class SpeakingTutor(BaseTutor):
         history: Optional[List[Dict[str, Any]]],
         level: Optional[str] = None,
         speaking_mode: Optional[str] = None,
+        stop_event: Optional[threading.Event] = None,
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Optional[str]], None, None]:
         """
         Gets bot response, yields audio for immediate playback, waits for it to finish,
@@ -108,6 +109,9 @@ class SpeakingTutor(BaseTutor):
 
         current_history = history.copy() if history else []
         _logger.info(f"handle_bot_response: Start. History has {len(current_history)} messages.")
+
+        # Telemetry (if available on parent)
+        telemetry = getattr(self.tutor_parent, "telemetry", None)
 
         if not current_history or current_history[-1].get("role") != "user":
             _logger.warning("handle_bot_response called with invalid history state. Aborting.")
@@ -190,6 +194,7 @@ class SpeakingTutor(BaseTutor):
 
         # Ensure variable is defined even if multimodal call raises repeatedly
         bot_text_response: str = ""
+        used_streaming_fallback: bool = False
 
         try:
             # Retry policy: default to 1 attempt, configurable via env
@@ -261,6 +266,18 @@ class SpeakingTutor(BaseTutor):
 
                 attempts += 1
 
+            # Post-multimodal telemetry on result shape
+            try:
+                if telemetry:
+                    if not bot_text_response:
+                        telemetry.inc_counter("text_missing_total", {"phase": "post_multimodal"})
+                    elif not audio_base64_data:
+                        telemetry.inc_counter("audio_missing_total", {"phase": "post_multimodal"})
+                    else:
+                        telemetry.inc_counter("multimodal_success_both_total", {"phase": "post_multimodal"})
+            except Exception:
+                pass
+
             # If multimodal did not yield text at all, try text-only fallback
             if not bot_text_response:
                 _logger.warning("Multimodal returned no text; attempting text-only fallback.")
@@ -270,10 +287,17 @@ class SpeakingTutor(BaseTutor):
                         service=self.tutor_parent.openai_service,
                         telemetry=getattr(self.tutor_parent, "telemetry", None),
                     )
+                    # Telemetry: stream fallback start
+                    try:
+                        if telemetry:
+                            telemetry.inc_counter("stream_fallback_total", {"reason": "text_missing"})
+                    except Exception:
+                        pass
                     # Stream to UI incrementally using callbacks + queue
                     q: "queue.Queue" = queue.Queue()
                     acc: List[str] = []
                     done_flag = {"done": False}
+                    used_streaming_fallback = True
 
                     def on_chunk(ch: str) -> None:
                         q.put(("data", ch))
@@ -293,6 +317,7 @@ class SpeakingTutor(BaseTutor):
                                 on_chunk=on_chunk,
                                 on_complete=on_complete,
                                 on_error=on_error,
+                                stop_event=stop_event,
                             )
                         except Exception as _:
                             # Error already reported via on_error
@@ -309,6 +334,11 @@ class SpeakingTutor(BaseTutor):
                             kind, payload = q.get(timeout=0.1)
                         except queue.Empty:
                             # keep UI responsive while waiting
+                            if stop_event is not None and stop_event.is_set():
+                                done_flag["done"] = True
+                                # Final yield so UI reflects latest partial text before stopping
+                                yield current_history, current_history, None
+                                break
                             if done_flag["done"]:
                                 break
                             # Yield current state even without new chunks to let UI refresh
@@ -324,6 +354,15 @@ class SpeakingTutor(BaseTutor):
                         elif kind == "done":
                             done_flag["done"] = True
                             bot_text_response = payload or ""  # full text
+                            # Telemetry: stream finished successfully
+                            try:
+                                if telemetry:
+                                    telemetry.inc_counter(
+                                        "stream_fallback_completed_total",
+                                        {"status": "success", "chars": len(bot_text_response)},
+                                    )
+                            except Exception:
+                                pass
                             break
                         elif kind == "error":
                             err = payload
@@ -334,10 +373,30 @@ class SpeakingTutor(BaseTutor):
                             current_history.append({"role": "assistant", "content": "(streaming error)"})
                             yield current_history, current_history, None
                             bot_text_response = "".join(acc)
+                            # Telemetry: stream finished with error
+                            try:
+                                if telemetry:
+                                    telemetry.inc_counter(
+                                        "stream_fallback_completed_total",
+                                        {"status": "error", "partial_chars": len(bot_text_response)},
+                                    )
+                            except Exception:
+                                pass
                             break
 
                     # Ensure worker finished
                     t.join(timeout=0.1)
+                    # If cancelled (no 'done'), preserve partial text
+                    if not bot_text_response and acc:
+                        bot_text_response = "".join(acc)
+                        try:
+                            if telemetry:
+                                telemetry.inc_counter(
+                                    "stream_fallback_completed_total",
+                                    {"status": "cancelled", "partial_chars": len(bot_text_response)},
+                                )
+                        except Exception:
+                            pass
                     _logger.info("Text-only fallback produced %d chars.", len(bot_text_response))
                 except Exception as e:
                     _logger.error("Text-only fallback failed: %s", e, exc_info=True)
@@ -352,25 +411,56 @@ class SpeakingTutor(BaseTutor):
                     if len(tts_text) > max_tts_chars:
                         _logger.info(f"TTS input too long ({len(tts_text)} chars). Truncating to {max_tts_chars}.")
                         tts_text = tts_text[:max_tts_chars] + "..."
+                    # Telemetry: TTS fallback attempt
+                    try:
+                        if telemetry:
+                            telemetry.inc_counter("tts_fallback_attempt_total")
+                    except Exception:
+                        pass
                     audio_bytes = self.tutor_parent.openai_service.text_to_speech(tts_text)
                     # The service returns raw bytes, so we need to encode it to base64
                     audio_base64_data = base64.b64encode(audio_bytes).decode("utf-8")
                     _logger.info("Successfully generated audio using TTS fallback.")
+                    try:
+                        if telemetry:
+                            telemetry.inc_counter("tts_fallback_success_total")
+                    except Exception:
+                        pass
                 except Exception as e:
                     _logger.error(f"TTS fallback failed: {e}", exc_info=True)
                     # If TTS also fails, we proceed with no audio
                     audio_base64_data = None
+                    try:
+                        if telemetry:
+                            telemetry.inc_counter("tts_fallback_error_total", {"error": type(e).__name__})
+                    except Exception:
+                        pass
 
             # If we have text but no audio, send text-only fallback so the chat still updates
             if bot_text_response and not audio_base64_data:
                 _logger.warning("Audio unavailable; sending text-only fallback message.")
-                current_history.append({"role": "assistant", "content": bot_text_response})
+                # Telemetry: text-only outcome
                 try:
-                    _update_running_summary(_get_last_user_text(), bot_text_response)
-                except Exception as e:
-                    _logger.debug("Summary update skipped (text-only): %s", e)
-                yield current_history, current_history, None
-                return
+                    if telemetry:
+                        telemetry.inc_counter("text_only_fallback_total")
+                except Exception:
+                    pass
+                if used_streaming_fallback:
+                    # Já atualizamos a bolha do assistant via streaming; não duplicar
+                    try:
+                        _update_running_summary(_get_last_user_text(), bot_text_response)
+                    except Exception as e:
+                        _logger.debug("Summary update skipped (text-only, streamed): %s", e)
+                    yield current_history, current_history, None
+                    return
+                else:
+                    current_history.append({"role": "assistant", "content": bot_text_response})
+                    try:
+                        _update_running_summary(_get_last_user_text(), bot_text_response)
+                    except Exception as e:
+                        _logger.debug("Summary update skipped (text-only): %s", e)
+                    yield current_history, current_history, None
+                    return
 
             # If we don't have text either, surface an error message
             if not bot_text_response:
@@ -407,6 +497,11 @@ class SpeakingTutor(BaseTutor):
             _logger.info("Audio-first UX: Yielding audio for playback.")
             yield current_history, current_history, audio_path
 
+            # If we already streamed the text fallback, avoid re-streaming/duplicating text
+            if used_streaming_fallback:
+                _logger.info("Streaming fallback was used earlier; skipping re-stream of text.")
+                return
+
             # 2. Wait for the audio to finish playing before showing the text.
             duration = get_audio_duration(audio_path)
             # Add a small buffer to the wait time
@@ -423,6 +518,11 @@ class SpeakingTutor(BaseTutor):
 
             words = bot_full_text.split()
             for i, word in enumerate(words):
+                if stop_event is not None and stop_event.is_set():
+                    _logger.info("Simulated text stream cancelled by stop_event.")
+                    # Yield current state once before stopping so UI shows latest partial
+                    yield current_history, current_history, None
+                    break
                 # Update the content of the last message
                 current_history[-1]["content"] += word + " "
 

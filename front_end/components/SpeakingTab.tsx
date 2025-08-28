@@ -86,6 +86,14 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const awaitingAssistantRef = useRef<boolean>(false);
   const [botSpeaking, setBotSpeaking] = useState<boolean>(false);
   const streamingJobRef = useRef<(() => void) | null>(null);
+  // Stream watchdog to auto-cancel lingering jobs
+  const streamWatchdogTimerRef = useRef<number | null>(null);
+  const lastActivityRef = useRef<number>(0);
+  const STEP_TIMEOUT_SEC: number = Number(
+    ((import.meta as any).env?.VITE_SPEAKING_STEP_TIMEOUT_SEC as string) ?? 25
+  );
+  // Track chosen recording MIME type per session
+  const recordingMimeRef = useRef<string>("");
   // Track last bot audio URL to include in escalation payload if assistant message isn't populated yet
   const lastAudioUrlRef = useRef<string | null>(null);
   // Track last user audio (as data URL) to recompute metrics when transcript arrives
@@ -112,7 +120,13 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
 
     return () => {
       audioContextRef.current?.close();
+      // Cancel any in-flight streaming job
       if (streamingJobRef.current) streamingJobRef.current();
+      // Clear watchdog timer
+      if (streamWatchdogTimerRef.current) {
+        window.clearTimeout(streamWatchdogTimerRef.current);
+        streamWatchdogTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -202,6 +216,27 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
     ) {
       audioContextRef.current.resume();
     }
+  };
+
+  // Pick a supported audio MIME type for MediaRecorder depending on the browser
+  const pickRecordingMime = (): string => {
+    const candidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/aac",
+      "audio/mpeg", // fallback
+    ];
+    const isSupported = (t: string) =>
+      typeof MediaRecorder !== "undefined" &&
+      typeof (MediaRecorder as any).isTypeSupported === "function" &&
+      (MediaRecorder as any).isTypeSupported(t);
+    for (const t of candidates) {
+      try {
+        if (isSupported(t)) return t;
+      } catch {}
+    }
+    return ""; // let browser choose default
   };
 
   // Plays audio from a URL using the Web Audio API
@@ -294,21 +329,43 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
       console.debug("[UX] 🎤 getUserMedia acquired");
       setIsRecording(true);
       audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
+      const chosen = pickRecordingMime();
+      recordingMimeRef.current = chosen;
+      console.debug("[UX] 🎛️ MediaRecorder mimeType:", chosen || "(browser default)");
+      const opts = chosen ? { mimeType: chosen } : undefined;
+      const recorder = new MediaRecorder(stream, opts as any);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       recorder.onstop = async () => {
         console.info("[UX] ⏹️ recorder.onstop");
+        try {
+          // Stop mic tracks to release resources
+          stream.getTracks().forEach((t) => t.stop());
+        } catch {}
+        const inferredType =
+          audioChunksRef.current[0]?.type || recordingMimeRef.current || "";
         const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
+          type: inferredType,
         });
         console.debug(
           `[UX] 💾 audioBlob size=${audioBlob.size}B, chunks=${audioChunksRef.current.length}`
         );
+        if (!audioBlob.size) {
+          console.warn("[UX] ⚠️ Empty recording blob; aborting upload and resetting UI.");
+          setIsRecording(false);
+          setIsLoading(false);
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "I couldn't hear anything. Please try again." },
+          ]);
+          return;
+        }
         const userPlaceholder: ChatMessage = { role: "user", content: null };
         const botPlaceholder: ChatMessage = {
           role: "assistant",
@@ -331,12 +388,33 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             { role: "assistant", content: "Sorry, an error occurred." },
           ]);
           setIsLoading(false);
+          // On error, clear watchdog
+          if (streamWatchdogTimerRef.current) {
+            window.clearTimeout(streamWatchdogTimerRef.current);
+            streamWatchdogTimerRef.current = null;
+          }
+        };
+
+        const armWatchdog = () => {
+          if (streamWatchdogTimerRef.current) {
+            window.clearTimeout(streamWatchdogTimerRef.current);
+          }
+          streamWatchdogTimerRef.current = window.setTimeout(() => {
+            console.warn(
+              `[UX] ⏱️ Stream watchdog fired after ${STEP_TIMEOUT_SEC}s without activity; cancelling job.`
+            );
+            if (streamingJobRef.current) streamingJobRef.current();
+            setIsLoading(false);
+            awaitingAssistantRef.current = false;
+          }, STEP_TIMEOUT_SEC * 1000);
         };
 
         // Start the streaming job
         console.info(
           `[UX] 🚀 start streaming (mode=${practiceMode}, level=${englishLevel})`
         );
+        lastActivityRef.current = Date.now();
+        armWatchdog();
         streamingJobRef.current = api.handleTranscriptionAndResponse(
           audioBlob,
           englishLevel,
@@ -349,6 +427,8 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
                 serverMessages.length
               }, audioUrl=${Boolean(audioUrl)}`
             );
+            lastActivityRef.current = Date.now();
+            armWatchdog();
             if (audioUrl && !audioPlayedRef.current) {
               console.info("[UX] 🔊 playAudio invoked");
               playAudio(audioUrl);
@@ -428,7 +508,14 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
             setIsLoading(false);
             console.debug("[UX] ✅ onData applied to UI (merged)");
           },
-          handleError // onError callback
+          handleError, // onError callback
+          () => {
+            // onComplete: normal end of stream
+            if (streamWatchdogTimerRef.current) {
+              window.clearTimeout(streamWatchdogTimerRef.current);
+              streamWatchdogTimerRef.current = null;
+            }
+          }
         );
         // Post initial speaking metrics (without transcript) and attach badges to this user turn
         try {
@@ -450,7 +537,8 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           console.warn("blobToDataURL failed:", e);
         }
       };
-      recorder.start();
+      // Use a small timeslice to get periodic data and avoid zero-sized recordings on quick stops
+      recorder.start(250);
     } catch (err) {
       console.error("Failed to get microphone:", err);
       alert(

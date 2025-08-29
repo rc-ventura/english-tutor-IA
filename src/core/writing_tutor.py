@@ -1,8 +1,11 @@
 import logging
+import threading
+import queue
 from typing import Any, Dict, Generator, List, Optional, Tuple
 import gradio as gr
 from src.core.base_tutor import BaseTutor
 from src.utils.audio import save_audio_to_temp_file
+from src.infra.streaming_manager import StreamingManager
 
 
 class WritingTutor(BaseTutor):
@@ -11,25 +14,63 @@ class WritingTutor(BaseTutor):
         messages: List[Dict[str, Any]],
         history: List[Dict[str, Any]],
     ) -> Generator[Tuple[List[Dict[str, Any]], List[Dict[str, Any]]], None, None]:
-        """Helper to stream LLM response and update history, yielding for chatbot and state."""
+        """Stream LLM response using StreamingManager and update history incrementally."""
 
         assistant_message = {"role": "assistant", "content": ""}
         history.append(assistant_message)
 
+        # Emit initial state with empty assistant message
         yield history, history
 
+        # Queue to receive streaming events from callbacks
+        q: "queue.Queue" = queue.Queue()
+
+        def on_chunk(ch: str) -> None:
+            # Push chunk event for the generator loop to consume and yield
+            q.put(("chunk", ch))
+
+        def on_complete(full_text: str) -> None:
+            q.put(("end", full_text))
+
+        def on_error(err: Exception) -> None:
+            q.put(("error", err))
+
+        # Build a StreamingManager instance (reusing service and telemetry from parent)
+        mgr = StreamingManager(service=self.openai_service, telemetry=getattr(self.tutor_parent, "telemetry", None))
+
+        # Run the blocking stream_text in a background thread, feeding events to the queue
+        def _runner():
+            try:
+                mgr.stream_text(messages=messages, on_chunk=on_chunk, on_complete=on_complete, on_error=on_error)
+            except Exception as e:  # defensive, in case callbacks path didn't capture
+                on_error(e)
+
+        t = threading.Thread(target=_runner, daemon=True)
+        t.start()
+
+        reply_buffer = ""
         try:
-            reply_buffer = ""
-            for chunk in self.openai_service.stream_chat_completion(messages=messages):
-                reply_buffer += chunk
-                assistant_message["content"] = reply_buffer
-                yield history, history
-
-        except Exception as e:
-            logging.error(f"OpenAI chat completion error: {e}", exc_info=True)
-
-            assistant_message["content"] = f"Sorry, an error occurred: {e}"
-
+            while True:
+                kind, payload = q.get(timeout=60)  # generous timeout for long generations
+                if kind == "chunk":
+                    ch = payload
+                    if ch:
+                        reply_buffer += ch
+                        assistant_message["content"] = reply_buffer
+                        yield history, history
+                elif kind == "end":
+                    # Ensure content reflects final text (already accumulated)
+                    assistant_message["content"] = reply_buffer or (payload or "").strip()
+                    break
+                elif kind == "error":
+                    e = payload
+                    logging.error(f"WritingTutor streaming error: {e}", exc_info=True)
+                    assistant_message["content"] = f"Sorry, an error occurred: {e}"
+                    yield history, history
+                    break
+        except queue.Empty:
+            logging.warning("WritingTutor streaming timed out waiting for events.")
+            assistant_message["content"] = reply_buffer or "Sorry, the response took too long. Please try again."
             yield history, history
 
     def process_input(

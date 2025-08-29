@@ -171,9 +171,11 @@ export const generateRandomTopicStream = (
   level: EnglishLevel,
   writingType: WritingType,
   onData: (messages: ChatMessage[]) => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  onComplete?: () => void
 ) => {
   let job: ReturnType<Client["submit"]>;
+  let ended = false;
   const process = async () => {
     try {
       const client = await getClient();
@@ -191,8 +193,11 @@ export const generateRandomTopicStream = (
               onError(new Error(msg.message ?? "Streaming error"));
             }
           }
+          ended = true;
+          if (onComplete) onComplete();
         } catch (streamErr) {
           onError(streamErr as Error);
+          ended = true;
         }
       })();
     } catch (error) {
@@ -201,7 +206,18 @@ export const generateRandomTopicStream = (
   };
   process();
   return () => {
-    if (job) job.cancel();
+    // Avoid noisy cancel/reset calls when offline or after completion
+    if (!job) return;
+    if (ended) return;
+    if (typeof navigator !== "undefined" && navigator && (navigator as any).onLine === false) {
+      if (VERBOSE_GRADIO_LOGS) console.warn("Skip cancel: offline");
+      return;
+    }
+    try {
+      job.cancel();
+    } catch (e) {
+      if (VERBOSE_GRADIO_LOGS) console.warn("Cancel ignored due to error:", e);
+    }
   };
 };
 
@@ -226,9 +242,11 @@ export const processInputStream = (
   level: EnglishLevel,
   history: ChatMessage[],
   onData: (messages: ChatMessage[]) => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  onComplete?: () => void
 ) => {
   let job: ReturnType<Client["submit"]>;
+  let ended = false;
   const process = async () => {
     try {
       const client = await getClient();
@@ -249,8 +267,11 @@ export const processInputStream = (
               onError(new Error(msg.message ?? "Streaming error"));
             }
           }
+          ended = true;
+          if (onComplete) onComplete();
         } catch (streamErr) {
           onError(streamErr as Error);
+          ended = true;
         }
       })();
     } catch (error) {
@@ -259,7 +280,18 @@ export const processInputStream = (
   };
   process();
   return () => {
-    if (job) job.cancel();
+    // Avoid noisy cancel/reset calls when offline or after completion
+    if (!job) return;
+    if (ended) return;
+    if (typeof navigator !== "undefined" && navigator && (navigator as any).onLine === false) {
+      if (VERBOSE_GRADIO_LOGS) console.warn("Skip cancel: offline");
+      return;
+    }
+    try {
+      job.cancel();
+    } catch (e) {
+      if (VERBOSE_GRADIO_LOGS) console.warn("Cancel ignored due to error:", e);
+    }
   };
 };
 

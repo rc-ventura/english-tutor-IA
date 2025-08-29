@@ -101,21 +101,18 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
     }
   };
 
-  // // Normalize assistant text to improve readability when the model returns a single long paragraph
-  // function normalizeAssistantText(text: string): string {
-  //   if (!text) return "";
-  //   let t = text;
-  //   // Insert blank lines before common section headers (EN/PT): Day(s) X or X–Y
-  //   t = t.replace(
-  //     /\s+(?=(?:Days?|Day|Dias?|Dia)\s\d+(?:[–-]\d+)?\s*:)/g,
-  //     "\n\n"
-  //   );
-  //   // Ensure bullet items render as a list when the dash appears mid-paragraph
-  //   t = t.replace(/\s-\s/g, "\n- ");
-  //   // Collapse 3+ newlines to 2 for clean Markdown
-  //   t = t.replace(/\n{3,}/g, "\n\n");
-  //   return t.trim();
-  // }
+  // Normalize assistant text to improve readability when the model returns long or oddly spaced paragraphs
+  function normalizeAssistantText(text: string): string {
+    if (!text) return "";
+    let t = text;
+    // Ensure bullet items render as lists when dashes appear mid-paragraph
+    t = t.replace(/\s-\s/g, "\n- ");
+    // Collapse 3+ newlines to 2 for clean Markdown
+    t = t.replace(/\n{3,}/g, "\n\n");
+    // Trim excessive leading/trailing whitespace
+    t = t.trim();
+    return t;
+  }
 
   const renderContent = () => {
     if (practiceMode === "immersive") {
@@ -202,16 +199,16 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         );
       }
 
-      // Mantém o tratamento padrão para mensagens de texto
+      // Mantém o tratamento padrão para mensagens de texto (com normalização leve)
       const text =
         typeof message.content === "string"
           ? message.content
           : message.text_for_llm || "";
-      //const normalized = normalizeAssistantText(text);
+      const normalized = normalizeAssistantText(text);
       return (
-        <div className="max-w-3xl whitespace-pre-wrap break-words leading-relaxed chat-markdown">
+        <div className="max-w-3xl whitespace-pre-wrap break-words leading-normal chat-markdown">
           <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>
-            {text}
+            {normalized}
           </ReactMarkdown>
         </div>
       );
@@ -220,7 +217,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
 
   return (
     <div
-      className={`flex items-start gap-3 my-4 ${
+      className={`flex items-start gap-3 my-3 ${
         isUser ? "justify-end" : "justify-start"
       }`}
     >
@@ -230,7 +227,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         </div>
       )}
       <div
-        className={`relative px-4 py-3 rounded-2xl max-w-[80%] md:max-w-[70%] lg:max-w-[60%] ${
+        className={`relative px-4 py-2.5 rounded-2xl max-w-[80%] md:max-w-[70%] lg:max-w-[60%] ${
           isUser
             ? "bg-indigo-500 text-white rounded-br-none"
             : "bg-gray-700 text-gray-200 rounded-bl-none"

@@ -28,8 +28,34 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
     };
   }, []);
 
-  // Streaming: mantém referência para cancelar caso o usuário clique várias vezes
+  // Streaming: referências de cancelamento e watchdog
   const topicJobRef = useRef<null | (() => void)>(null);
+  const evalJobRef = useRef<null | (() => void)>(null);
+  const topicWatchdogRef = useRef<number | null>(null);
+  const evalWatchdogRef = useRef<number | null>(null);
+  const WRITING_TIMEOUT_MS: number = Number(
+    ((import.meta as any).env?.VITE_WRITING_STEP_TIMEOUT_MS as string) ?? 25000
+  );
+
+  // Cleanup timers and jobs on unmount
+  useEffect(() => {
+    return () => {
+      if (topicWatchdogRef.current) {
+        window.clearTimeout(topicWatchdogRef.current);
+        topicWatchdogRef.current = null;
+      }
+      if (evalWatchdogRef.current) {
+        window.clearTimeout(evalWatchdogRef.current);
+        evalWatchdogRef.current = null;
+      }
+      if (topicJobRef.current) {
+        try { topicJobRef.current(); } catch {}
+      }
+      if (evalJobRef.current) {
+        try { evalJobRef.current(); } catch {}
+      }
+    };
+  }, []);
 
   const handleGenerateTopic = () => {
     setIsLoading(true);
@@ -37,25 +63,66 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
     setHasEvaluated(false);
     // Cancela streaming anterior, se houver
     if (topicJobRef.current) topicJobRef.current();
-    let lastMessages: ChatMessage[] = [];
+    // no local accumulation needed
+
+    // Funções de watchdog
+    const armWatchdog = () => {
+      if (topicWatchdogRef.current) window.clearTimeout(topicWatchdogRef.current);
+      topicWatchdogRef.current = window.setTimeout(() => {
+        console.warn(`[Writing] Topic stream timeout after ${WRITING_TIMEOUT_MS}ms`);
+        if (topicJobRef.current) topicJobRef.current();
+        setIsLoading(false);
+      }, WRITING_TIMEOUT_MS);
+    };
+
+    // Helper: merge adjacent assistant messages into a single bubble
+    const compressAssistantRuns = (messages: ChatMessage[]): ChatMessage[] => {
+      const out: ChatMessage[] = [];
+      for (const m of messages) {
+        const last = out[out.length - 1];
+        if (
+          last &&
+          last.role === 'assistant' &&
+          m.role === 'assistant' &&
+          typeof last.content === 'string' &&
+          typeof m.content === 'string'
+        ) {
+          // Concatenate text to avoid multiple bubbles per stream chunk
+          last.content = `${last.content}${m.content}`;
+        } else {
+          out.push({ ...m });
+        }
+      }
+      return out;
+    };
+
     topicJobRef.current = api.generateRandomTopicStream(
       englishLevel,
       writingType,
       (messages) => {
-        lastMessages = messages;
-        setFeedbackMessages(messages);
+        setFeedbackMessages(compressAssistantRuns(messages));
+        armWatchdog();
       },
-      (error) => {
-        console.error("Failed to generate topic (stream):", error);
+      (_error) => {
+        console.error("Failed to generate topic (stream):", _error);
         setFeedbackMessages([{ role: 'assistant', content: 'Sorry, I could not generate a topic right now.' }]);
         setIsLoading(false);
+        if (topicWatchdogRef.current) {
+          window.clearTimeout(topicWatchdogRef.current);
+          topicWatchdogRef.current = null;
+        }
+      },
+      () => {
+        // onComplete
+        if (topicWatchdogRef.current) {
+          window.clearTimeout(topicWatchdogRef.current);
+          topicWatchdogRef.current = null;
+        }
+        setTimeout(() => setIsLoading(false), 200);
       }
     );
-    // Finaliza loading quando acabar o stream
-    // Como não temos callback "done" do Gradio, faz um pequeno delay após última mensagem
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    // Arma inicialmente
+    setTimeout(() => armWatchdog(), 0);
   };
 
 
@@ -64,8 +131,18 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
     setIsLoading(true);
     setHasEvaluated(false);
 
-    let lastTimeout: NodeJS.Timeout | null = null;
-    let lastMessages: ChatMessage[] = [];
+
+
+    // Watchdog helpers
+    const armEvalWatchdog = () => {
+      if (evalWatchdogRef.current) window.clearTimeout(evalWatchdogRef.current);
+      evalWatchdogRef.current = window.setTimeout(() => {
+        console.warn(`[Writing] Evaluation stream timeout after ${WRITING_TIMEOUT_MS}ms`);
+        if (evalJobRef.current) evalJobRef.current();
+        setIsLoading(false);
+        setHasEvaluated(true);
+      }, WRITING_TIMEOUT_MS);
+    };
 
     const cancel = api.processInputStream(
       essayText,
@@ -73,21 +150,49 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
       englishLevel,
       feedbackMessages,
       (messages) => {
-        lastMessages = messages;
-        setFeedbackMessages(messages);
-        // Reinicia o timeout a cada chunk recebido
-        if (lastTimeout) clearTimeout(lastTimeout);
-        lastTimeout = setTimeout(() => {
-          setIsLoading(false);
-          setHasEvaluated(true);
-        }, 800); // considera stream finalizado após 800ms sem novos dados
+        // Merge adjacent assistant chunks into one bubble
+        const merged = ((): ChatMessage[] => {
+          const out: ChatMessage[] = [];
+          for (const m of messages) {
+            const last = out[out.length - 1];
+            if (
+              last &&
+              last.role === 'assistant' &&
+              m.role === 'assistant' &&
+              typeof last.content === 'string' &&
+              typeof m.content === 'string'
+            ) {
+              last.content = `${last.content}${m.content}`;
+            } else {
+              out.push({ ...m });
+            }
+          }
+          return out;
+        })();
+        setFeedbackMessages(merged);
+        armEvalWatchdog();
       },
-      (error) => {
+      (_error) => {
         setIsLoading(false);
         setFeedbackMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred during evaluation.' }]);
+        if (evalWatchdogRef.current) {
+          window.clearTimeout(evalWatchdogRef.current);
+          evalWatchdogRef.current = null;
+        }
+      },
+      () => {
+        // onComplete
+        if (evalWatchdogRef.current) {
+          window.clearTimeout(evalWatchdogRef.current);
+          evalWatchdogRef.current = null;
+        }
+        setIsLoading(false);
+        setHasEvaluated(true);
       }
     );
-    // Opcional: retornar cancel para permitir interrupção futura
+    evalJobRef.current = cancel;
+    // Arma inicialmente
+    setTimeout(() => armEvalWatchdog(), 0);
     return cancel;
   };
 
@@ -152,7 +257,7 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
       <div className="flex flex-col h-full bg-gray-800 p-6 rounded-xl">
         <h2 className="text-xl font-bold mb-4">Feedback</h2>
         <div className="flex-1 overflow-y-auto">
-            <Chatbot messages={feedbackMessages} isLoading={isLoading} />
+            <Chatbot messages={feedbackMessages} isLoading={isLoading} practiceMode="hybrid" />
         </div>
       </div>
       <audio ref={audioPlayerRef} className="hidden" />

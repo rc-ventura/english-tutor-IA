@@ -399,6 +399,9 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           if (streamWatchdogTimerRef.current) {
             window.clearTimeout(streamWatchdogTimerRef.current);
           }
+          console.info(
+            `[UX] 🔒 Stream watchdog armed (will timeout after ${STEP_TIMEOUT_SEC}s of inactivity)`
+          );
           streamWatchdogTimerRef.current = window.setTimeout(() => {
             console.warn(
               `[UX] ⏱️ Stream watchdog fired after ${STEP_TIMEOUT_SEC}s without activity; cancelling job.`

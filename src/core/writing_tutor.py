@@ -137,39 +137,35 @@ class WritingTutor(BaseTutor):
         yield current_history, current_history
 
         system_prompt = self.tutor_parent.get_system_message(mode="writing", level=level)
-        prompt_for_llm = f"""Generate a topic for a writing essay for a student with the level of {level}. Analyze also the writing type {writing_type}.
+        prompt_for_llm = f"""Generate a topic for a writing essay for a student with level {level}. Also consider the writing type {writing_type}.
 
-        Format your response as visually appealing Markdown:
-        - Use clear section titles (e.g., **Essay Topic**, **Writing Type**, **Suggested Structure**, **Word Count Expectation**, **Additional Notes**).
-        - Use numbered and bulleted lists for structure.
-        - Add extra line breaks between sections for readability.
-        - Add at least one relevant emoji per section (e.g., 🐶 for animals, ✍️ for writing, 📋 for structure, 📏 for word count, 💡 for notes).
-        - Make it easy to read for beginner students: use short sentences and simple words.
-        - Add visual spacing (blank lines) between sections and after lists.
-        - Example:
+        Output Markdown with a COMPACT inline metadata header on the FIRST line (do not break items onto separate lines):
+        - Use bold inline labels and separate items with " • " (middle dot). If the dot is not available, use " | ".
+        - Include exactly these items, in this order: Essay Topic, Writing Type, Word Count.
+        - Do NOT add blank lines between these items; keep them on one single line.
+        - Immediately after this single-line header, insert a Markdown horizontal rule: --- on its own line.
 
-        **Essay Topic:** 🐶 "My Favorite Animal"
+        After the header, add one blank line, then provide:
+        - Suggested Structure: a numbered list (1–3 concise items).
+        - Additional Notes: 2–3 bullet points with simple language.
 
-        **Writing Type:** ✍️ Formal Essay
+        Keep the language simple for beginner students. Emojis are optional; if used, keep them minimal.
 
-        **Suggested Structure:** 📋
-        1. **Introduction**
-            - Introduce the topic and mention your favorite animal.
-        2. **Body Paragraph**
-            - Describe the animal (appearance, behavior).
-        3. **Conclusion**
-            - Summarize why you like this animal.
+        Example:
 
-        **Word Count Expectation:** 📏
-        - Total Words: 100-150
-        - Lines: 10-12
+        Essay Topic: "My Favorite Animal" • Writing Type: Formal Essay • Word Count: 100–150
+        ---
 
-        **Additional Notes:** 💡
-        - Use simple vocabulary and short sentences.
-        - Use linking words like "and" and "because".
-        - Leave blank lines between sections for clarity.
+        Suggested Structure:
+        1. Introduction — mention the animal.
+        2. Body — describe appearance and behavior.
+        3. Conclusion — explain why you like it.
 
-        Respond ONLY in Markdown, following this style."""
+        Additional Notes:
+        - Use short sentences.
+        - Use linking words like "and", "because".
+
+        Respond ONLY in Markdown following this exact structure."""
 
         messages_for_topic = [
             {"role": "system", "content": system_prompt},

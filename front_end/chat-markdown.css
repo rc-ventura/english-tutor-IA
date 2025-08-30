@@ -156,6 +156,17 @@
   margin: 1.25em 0;
 }
 
+/* Section spacing helpers: add breathing room between consecutive blocks */
+.chat-markdown p + p,
+.chat-markdown p + ul,
+.chat-markdown p + ol,
+.chat-markdown ul + p,
+.chat-markdown ol + p,
+.chat-markdown ul + ul,
+.chat-markdown ol + ol {
+  margin-top: 0.75em;
+}
+
 /* Loading spinner animation */
 .dot-flashing {
   position: relative;

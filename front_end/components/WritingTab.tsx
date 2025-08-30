@@ -216,27 +216,31 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-      <div className="flex flex-col h-full bg-gray-800 p-6 rounded-xl">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full min-h-0">
+      <div className="flex flex-col h-full min-h-0 bg-gray-800 p-6 rounded-xl">
         <h2 className="text-xl font-bold mb-4">Writing Practice</h2>
         <div className="mb-4">
             <label className="text-sm font-medium text-gray-300">Writing Type</label>
             <div className="flex flex-wrap gap-2 mt-2">
                 {WRITING_TYPES.map(type => (
-                    <button key={type} onClick={() => setWritingType(type)} className={`px-3 py-1.5 text-sm rounded-full transition-colors ${writingType === type ? 'bg-indigo-600 text-white font-semibold' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
-                        {type}
+                    <button
+                      key={type}
+                      onClick={() => setWritingType(type)}
+                      className={`px-3 py-1.5 text-sm rounded-full transition-colors ${writingType === type ? 'bg-indigo-600 text-white font-semibold' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}
+                    >
+                      {type}
                     </button>
                 ))}
             </div>
         </div>
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col">
             <label htmlFor="essay-input" className="text-sm font-medium text-gray-300 mb-2">Your Text</label>
             <textarea
                 id="essay-input"
                 value={essayText}
                 onChange={(e) => setEssayText(e.target.value)}
                 placeholder="Start writing here after generating a topic, or write about anything you want..."
-                className="w-full flex-1 bg-gray-900 border border-gray-700 rounded-lg p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                className="w-full h-64 md:h-80 xl:h-[28rem] resize-y bg-gray-900 border border-gray-700 rounded-lg p-4 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors overflow-auto"
             />
         </div>
          <div className="mt-4 flex flex-wrap gap-3">
@@ -255,10 +259,10 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
             Clear
           </button>
         </div>
-      </div>
-      <div className="flex flex-col h-full bg-gray-800 p-6 rounded-xl">
+        </div>
+      <div className="flex flex-col h-full min-h-0 bg-gray-800 p-6 rounded-xl">
         <h2 className="text-xl font-bold mb-4">Feedback</h2>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
             <Chatbot messages={feedbackMessages} isLoading={isLoading} practiceMode="hybrid" />
         </div>
       </div>

@@ -75,32 +75,34 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
       }, WRITING_TIMEOUT_MS);
     };
 
-    // Helper: merge adjacent assistant messages into a single bubble
-    const compressAssistantRuns = (messages: ChatMessage[]): ChatMessage[] => {
-      const out: ChatMessage[] = [];
-      for (const m of messages) {
-        const last = out[out.length - 1];
-        if (
-          last &&
-          last.role === 'assistant' &&
-          m.role === 'assistant' &&
-          typeof last.content === 'string' &&
-          typeof m.content === 'string'
-        ) {
-          // Concatenate text to avoid multiple bubbles per stream chunk
-          last.content = `${last.content}${m.content}`;
-        } else {
-          out.push({ ...m });
+    // Mostra um único placeholder inline dentro da bolha do assistente
+    setFeedbackMessages([{ role: 'assistant', content: null }]);
+
+    // Extrai o último texto do assistente (ignora placeholders vazios)
+    const getAssistantText = (msgs: ChatMessage[]): string | null => {
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const m = msgs[i];
+        if (m.role === 'assistant') {
+          if (typeof m.content === 'string') {
+            const s = m.content.trim();
+            return s.length ? m.content : null;
+          }
         }
       }
-      return out;
+      return null;
     };
 
     topicJobRef.current = api.generateRandomTopicStream(
       englishLevel,
       writingType,
       (messages) => {
-        setFeedbackMessages(compressAssistantRuns(messages));
+        const text = getAssistantText(messages);
+        // Mantém uma única bolha: placeholder (null) enquanto vazio, texto quando disponível
+        setFeedbackMessages([{ role: 'assistant', content: text }]);
+        // Assim que chegar o primeiro chunk de texto, escondemos o TypingBubble global
+        if (text !== null) {
+          setIsLoading(false);
+        }
         armWatchdog();
       },
       (_error) => {

@@ -206,7 +206,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
           : message.text_for_llm || "";
       const normalized = normalizeAssistantText(text);
       return (
-        <div className="max-w-3xl whitespace-pre-wrap break-words leading-normal chat-markdown">
+        <div className="w-full break-words leading-relaxed chat-markdown">
           <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>
             {normalized}
           </ReactMarkdown>
@@ -227,7 +227,7 @@ const ChatMessageBubble: React.FC<ChatMessageBubbleProps> = ({
         </div>
       )}
       <div
-        className={`relative px-4 py-2.5 rounded-2xl max-w-[80%] md:max-w-[70%] lg:max-w-[60%] ${
+        className={`relative px-4 py-2.5 rounded-2xl max-w-[95%] md:max-w-[85%] lg:max-w-[75%] ${
           isUser
             ? "bg-indigo-500 text-white rounded-br-none"
             : "bg-gray-700 text-gray-200 rounded-bl-none"
@@ -379,7 +379,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       ref={scrollRef}
       className="relative h-full overflow-y-auto p-4 pr-6 chat-scrollbar"
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full">
         {stickyHeader ? (
           <div className="sticky top-0 z-20 pb-2">{stickyHeader}</div>
         ) : null}

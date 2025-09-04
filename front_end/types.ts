@@ -4,6 +4,7 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: any; // Can be string or Gradio file object { file: { url: string } }
   text_for_llm?: string; // Holds transcription for audio messages
+  isLoading?: boolean;  // New optional property
 };
 
 export type EnglishLevel = (typeof ENGLISH_LEVELS)[number];

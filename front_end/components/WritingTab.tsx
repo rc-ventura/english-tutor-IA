@@ -130,10 +130,12 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
 
   const handleEvaluate = () => {
     if (!essayText.trim()) return;
-    setIsLoading(true);
     setHasEvaluated(false);
 
-
+    // Create a single loading bubble
+    setFeedbackMessages([
+      { role: 'assistant', content: '', isLoading: true }
+    ]);
 
     // Watchdog helpers
     const armEvalWatchdog = () => {
@@ -141,8 +143,10 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
       evalWatchdogRef.current = window.setTimeout(() => {
         console.warn(`[Writing] Evaluation stream timeout after ${WRITING_TIMEOUT_MS}ms`);
         if (evalJobRef.current) evalJobRef.current();
-        setIsLoading(false);
-        setHasEvaluated(true);
+        // Remove loading state on timeout
+        setFeedbackMessages(prev =>
+          prev.map(msg => msg.isLoading ? { ...msg, isLoading: false } : msg)
+        );
       }, WRITING_TIMEOUT_MS);
     };
 
@@ -150,50 +154,38 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
       essayText,
       writingType,
       englishLevel,
-      feedbackMessages,
+      feedbackMessages.filter(m => !m.isLoading),  // Filter out loading messages
       (messages) => {
-        // Merge adjacent assistant chunks into one bubble
-        const merged = ((): ChatMessage[] => {
-          const out: ChatMessage[] = [];
-          for (const m of messages) {
-            const last = out[out.length - 1];
-            if (
-              last &&
-              last.role === 'assistant' &&
-              m.role === 'assistant' &&
-              typeof last.content === 'string' &&
-              typeof m.content === 'string'
-            ) {
-              last.content = `${last.content}${m.content}`;
-            } else {
-              out.push({ ...m });
-            }
-          }
-          return out;
-        })();
-        setFeedbackMessages(merged);
+        // Update the loading bubble with the received content
+        const updatedMessages = messages.map((msg, index) =>
+          index === 0 ? { ...msg, isLoading: false } : msg
+        );
+        setFeedbackMessages(updatedMessages);
         armEvalWatchdog();
       },
       (_error) => {
-        setIsLoading(false);
-        setFeedbackMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred during evaluation.' }]);
+        // On error, remove loading and show error
+        setFeedbackMessages(prev => [
+          ...prev.filter(msg => !msg.isLoading),
+          { role: 'assistant', content: 'An error occurred during evaluation.' }
+        ]);
         if (evalWatchdogRef.current) {
           window.clearTimeout(evalWatchdogRef.current);
           evalWatchdogRef.current = null;
         }
       },
       () => {
-        // onComplete
+        // onComplete: remove loading state
         if (evalWatchdogRef.current) {
           window.clearTimeout(evalWatchdogRef.current);
           evalWatchdogRef.current = null;
         }
-        setIsLoading(false);
-        setHasEvaluated(true);
+        setFeedbackMessages(prev =>
+          prev.map(msg => msg.isLoading ? { ...msg, isLoading: false } : msg)
+        );
       }
     );
     evalJobRef.current = cancel;
-    // Arma inicialmente
     setTimeout(() => armEvalWatchdog(), 0);
     return cancel;
   };

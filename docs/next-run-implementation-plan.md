@@ -28,19 +28,18 @@ Este README resume o que já está implementado e o que será implementado na pr
   - `src/infra/temp_audio_manager.py` com limpeza por idade/contagem/tamanho.
   - Uso oportunista em `src/utils/audio.py:save_audio_to_temp_file()`.
 
-- **Progress Dashboard (HTML atual)**
-  - Backend: `src/core/progress_tracker.py` com HTML (`html_dashboard()`).
-  - UI Gradio na aba Progress em `ui/interfaces.py`.
-  - Frontend tem `front_end/components/ProgressTab.tsx` e `front_end/types.ts (ProgressData)`.
+- **Progress Dashboard (JSON)**
+  - `src/core/progress_tracker.py` com `to_json()` e serialização de badges
+  - Endpoint `GET /api/progress` em `ui/interfaces.py`
+  - Frontend `ProgressTab.tsx` consumindo JSON via `api.getProgressData()`
+  - Testes: `tests/test_speaking_progress.py` para XP/skills
+
+- **Speaking XP/Skills**
+  - XP/tasks: +20 XP por turno em `speaking_tutor.handle_bot_response()`
+  - Pronunciation skill: atualizado com métricas em `handle_transcription()`
+  - Testes unitários para validação
 
 ## Lacunas (a implementar)
-
-- **Progress JSON endpoint**
-  - Backend ainda não expõe `GET /api/progress` em JSON.
-  - `ProgressTab.tsx` espera `ProgressData` (JSON), mas hoje consome HTML via `getProgressHtml()`.
-
-- **Cálculo de nível/thresholds e badges no JSON**
-  - `ProgressTracker` precisa fornecer `level`, `xpForCurrentLevel`, `xpForNextLevel` e `badges` com `unlocked`.
 
 - **Teacher Dashboard (frontend)**
   - Falta UI para listar/filtrar resoluções e tocar áudio de escalations.
@@ -54,35 +53,22 @@ Este README resume o que já está implementado e o que será implementado na pr
 
 ## Plano da Próxima Rodada
 
-1) **Progress em JSON (prioridade alta)**
-   - Backend
-     - `src/core/progress_tracker.py`: adicionar `to_json()` com:
-       - `xp`, `level`, `xpForCurrentLevel`, `xpForNextLevel`, `tasksCompleted`.
-       - `skills` e `badges` com `{ name, description, unlocked, iconName }`.
-     - `ui/interfaces.py`: criar `GET /api/progress` retornando `application/json`.
+1) **Teacher Dashboard (prioridade alta)**
    - Frontend
-     - `front_end/services/api.ts`: substituir `getProgressHtml()` por `getProgressData()` (REST JSON).
-     - `front_end/components/ProgressTab.tsx`: consumir `ProgressData` e remover dependência de HTML.
-     - Validar tipos em `front_end/types.ts`.
+     - `front_end/components/TeacherDashboard.tsx`:
+       - Listar escalations (abertas/resolvidas)
+       - Ver detalhes e tocar áudio
+       - Marcar como resolvido
+     - Integração com endpoints existentes
 
-2) **Teacher Dashboard (prioridade média)**
+2) **Perfis de Usuário (prioridade média)**
    - Frontend
-     - Novo `front_end/components/TeacherDashboard.tsx`:
-       - Listar escalations (abertas/resolvidas), ver detalhes, tocar áudio e resolver.
-       - Usar endpoints: `GET /api/escalations`, `GET /api/escalations/{id}/audio`, `POST /api/escalations/{id}/resolve`.
-     - Navegação
-       - Adicionar tab no `front_end/App.tsx` e item no `front_end/components/Sidebar.tsx`.
-
-3) **Perfis de Usuário (prioridade média)**
-   - Frontend
-     - `front_end/components/Login.tsx`: capturar `userId` (e-mail), salvar em `localStorage`.
-     - Incluir `userId` nas chamadas REST que precisam de escopo.
+     - Capturar `userId` no login e propagar para chamadas
    - Backend
-     - Prover armazenamento simples por usuário (in-memory/JSONL) para progresso: map `userId -> ProgressTracker`.
+     - Armazenamento básico por usuário (memória/JSONL)
 
-4) **Scheduler de limpeza de áudios (prioridade baixa/opcional)**
-   - Backend
-     - Thread/cron simples no startup para chamar `maintain_tmp_audio_dir()` periodicamente (env-configurável).
+3) **Scheduler de limpeza de áudios (prioridade baixa)**
+   - Thread periódica chamando `temp_audio_manager.maintain_tmp_audio_dir()`
 
 ## Contrato de API Proposto (Progress)
 
@@ -126,6 +112,7 @@ Este README resume o que já está implementado e o que será implementado na pr
 
 ## Próximos (posteriores à rodada)
 
-- Persistência robusta de perfis (db/arquivo por usuário).
-- KPIs no Teacher Dashboard e filtros avançados.
-- Scheduler de limpeza ajustável por ambiente com métricas de housekeeping.
+- Dashboard de KPIs para professores
+- Persistência robusta de perfis
+- Badges específicas para speaking
+- Integração de métricas avançadas

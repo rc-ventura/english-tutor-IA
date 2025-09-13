@@ -121,6 +121,7 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
           topicWatchdogRef.current = null;
         }
         setTimeout(() => setIsLoading(false), 200);
+        setHasEvaluated(true);  // Enable playback after topic generation
       }
     );
     // Arma inicialmente
@@ -183,6 +184,7 @@ const WritingTab: React.FC<WritingTabProps> = ({ englishLevel }) => {
         setFeedbackMessages(prev =>
           prev.map(msg => msg.isLoading ? { ...msg, isLoading: false } : msg)
         );
+        setHasEvaluated(true);  // Enable playback after evaluation
       }
     );
     evalJobRef.current = cancel;

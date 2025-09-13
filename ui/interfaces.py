@@ -382,4 +382,12 @@ def run_gradio_interface(tutor: "EnglishTutor"):
                 except Exception:
                     pass
 
+    # ------------------- Progress API (FastAPI) -------------------
+    @app.get("/api/progress")
+    async def get_progress():
+        try:
+            return tutor.progress_tracker.to_json()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     return app

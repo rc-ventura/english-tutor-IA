@@ -127,7 +127,7 @@ const ProgressTab: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getProgressHtml();
+      const data = await api.getProgressData();
       setProgressData(data);
     } catch (err) {
       console.error("Failed to fetch progress:", err);

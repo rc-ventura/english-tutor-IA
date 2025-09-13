@@ -13,6 +13,7 @@ from src.utils.audio import (
     extract_text_from_response,
     get_audio_duration,
     save_audio_to_temp_file,
+    analyze_pronunciation_metrics,
 )
 from src.infra.streaming_manager import StreamingManager
 
@@ -86,6 +87,22 @@ class SpeakingTutor(BaseTutor):
                 user_message = {"role": "user", "content": transcription}
 
             current_history.append(user_message)
+
+            # Atualizar skill de pronúncia com base nas métricas
+            if self.tutor_parent and hasattr(self.tutor_parent, "progress_tracker"):
+                try:
+                    metrics = analyze_pronunciation_metrics(audio_filepath, transcript=transcription, level=level)
+
+                    points = 1
+                    if metrics.get("speech_ratio", 0) >= 0.45:
+                        points += 1
+                    if not metrics.get("suggested_escalation", True):
+                        points += 1
+
+                    self.tutor_parent.progress_tracker.update_skill("pronunciation", points)
+                except Exception as e:
+                    logging.error(f"Erro ao atualizar skill de pronúncia: {e}")
+
             return current_history, current_history
         except Exception as e:
             error_message = {"role": "assistant", "content": f"Error transcribing audio: {str(e)}"}
@@ -179,8 +196,8 @@ class SpeakingTutor(BaseTutor):
                     self._running_summary = updated[:max_chars]
                     _logger.info("Running summary updated via LLM, new_len=%d", len(self._running_summary))
                     return
-            except Exception as e:
-                _logger.debug(f"LLM summary update failed, falling back to truncation: {e}")
+            except Exception as diag_e:
+                _logger.debug(f"LLM summary update failed, falling back to truncation: {diag_e}")
             combined = (prev + " " + last_user_text + " " + bot_text).strip()
             self._running_summary = combined[-max_chars:]
             _logger.info("Running summary updated via truncation, new_len=%d", len(self._running_summary))
@@ -545,3 +562,11 @@ class SpeakingTutor(BaseTutor):
             current_history.append({"role": "assistant", "content": error_msg})
 
             yield current_history, current_history, None
+
+        # Atualizar XP e tasks após resposta bem-sucedida
+        if self.tutor_parent and hasattr(self.tutor_parent, "progress_tracker"):
+            try:
+                self.tutor_parent.progress_tracker.add_xp(20)
+                self.tutor_parent.progress_tracker.increment_tasks()
+            except Exception as e:
+                logging.error(f"Erro ao atualizar progresso: {e}")

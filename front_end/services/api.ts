@@ -1,5 +1,5 @@
 import { Client, handle_file } from "@gradio/client";
-import type { EnglishLevel, WritingType, ChatMessage } from "../types";
+import type { EnglishLevel, WritingType, ChatMessage, ProgressData } from "../types";
 import type {
   GradioFile,
   GradioProgressPayload,
@@ -330,6 +330,11 @@ export const getProgressHtml = async (): Promise<string> => {
     (response.data as GradioProgressPayload)[0] ??
     '<p class="text-gray-400">No progress data available.</p>'
   );
+};
+
+// PROGRESS (JSON)
+export const getProgressData = async (): Promise<ProgressData> => {
+  return jsonFetch<ProgressData>(`${API_BASE_URL}/api/progress`);
 };
 
 // ---------- Escalation API ----------

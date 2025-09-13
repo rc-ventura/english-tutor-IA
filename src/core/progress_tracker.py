@@ -101,6 +101,51 @@ class ProgressTracker:
         </div>
         """
 
+    def _level_info(self) -> dict[str, int]:
+        """Compute simple level progression metrics from XP.
+
+        - Level starts at 1 and increases every 100 XP.
+        - xp_for_current is the lower bound for the current level.
+        - xp_for_next is the XP required to reach the next level.
+        """
+        xp_per_level = 100
+        level = max(1, self.xp // xp_per_level + 1)
+        xp_for_current = (level - 1) * xp_per_level
+        xp_for_next = level * xp_per_level
+        return {"level": level, "xp_for_current": xp_for_current, "xp_for_next": xp_for_next}
+
+    def to_json(self) -> dict:
+        """Return structured progress data for REST consumption.
+
+        Matches the frontend `ProgressData` type in `front_end/types.ts`:
+          { xp, level, xpForCurrentLevel, xpForNextLevel, tasksCompleted, skills, badges[] }
+        """
+        info = self._level_info()
+        # Include both XP/task-based and special skill-based badges in the list
+        special_badges: List[BadgeDefinition] = [
+            BadgeDefinition(name="Grammar Guru", description="Reach 50 grammar points", threshold=0)
+        ]
+        all_defs: List[BadgeDefinition] = [*self.BADGES, *special_badges]
+        badges = [
+            {
+                "name": bd.name,
+                "description": bd.description,
+                "unlocked": bd.name in self.badges,
+                "iconName": bd.name,
+            }
+            for bd in all_defs
+        ]
+
+        return {
+            "xp": self.xp,
+            "level": info["level"],
+            "xpForCurrentLevel": info["xp_for_current"],
+            "xpForNextLevel": info["xp_for_next"],
+            "tasksCompleted": self.tasks_completed,
+            "skills": self.skills,
+            "badges": badges,
+        }
+
     # ------------------------------------------------------------------
     # Internal utilities
     # ------------------------------------------------------------------

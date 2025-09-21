@@ -92,6 +92,9 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
   const STEP_TIMEOUT_SEC: number = Number(
     ((import.meta as any).env?.VITE_SPEAKING_STEP_TIMEOUT_SEC as string) ?? 25
   );
+  // Feature flag to control whether the sticky speaking banner is shown
+  const SHOW_SPEAKING_BANNER: boolean =
+    ((import.meta as any).env?.VITE_SHOW_SPEAKING_BANNER as string) === "true";
   // Track chosen recording MIME type per session
   const recordingMimeRef = useRef<string>("");
   // Track last bot audio URL to include in escalation payload if assistant message isn't populated yet
@@ -834,7 +837,7 @@ const SpeakingTab: React.FC<SpeakingTabProps> = ({ englishLevel }) => {
           escalatedIndices={escalatedIndices}
           userBadgesByIndex={userBadgesByIndex}
           stickyHeader={
-            bannerVisible && speakingMetrics ? (
+            SHOW_SPEAKING_BANNER && bannerVisible && speakingMetrics ? (
               <SpeakingStickyBanner
                 metrics={speakingMetrics}
                 level={englishLevel}

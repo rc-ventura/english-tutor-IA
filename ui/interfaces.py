@@ -240,13 +240,21 @@ def run_gradio_interface(tutor: "EnglishTutor"):
     app = mount_gradio_app(app, demo, path="/gradio")
 
     # Add the CORS middleware to the FastAPI app
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
+    # Configure CORS: allow origins from env or default to localhost
+    origins_env = os.getenv("ALLOWED_ORIGINS")
+    if origins_env:
+        allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
+    else:
+        allow_origins = [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-        ],
-        allow_credentials=True,
+        ]
+    # If '*' is present, disable credentials per CORS spec
+    allow_any_origin = "*" in allow_origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"] if allow_any_origin else allow_origins,
+        allow_credentials=False if allow_any_origin else True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -389,5 +397,10 @@ def run_gradio_interface(tutor: "EnglishTutor"):
             return tutor.progress_tracker.to_json()
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    # Simple health check for platform probes
+    @app.get("/healthz")
+    async def healthz():
+        return {"status": "ok"}
 
     return app

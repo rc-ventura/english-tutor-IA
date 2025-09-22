@@ -113,7 +113,12 @@ class EnglishTutor:
     def launch_ui(self):
         """Run the Gradio interface."""
         app = run_gradio_interface(self)
-        uvicorn.run(app, host="127.0.0.1", port=7901, log_level="info")
+        # Bind host/port from environment to satisfy security linters and hosting platforms
+        # - Default host: 127.0.0.1 for local dev
+        # - On Render (or similar), set HOST=0.0.0.0 and PORT provided by platform
+        host = os.getenv("HOST", "127.0.0.1")
+        port = int(os.getenv("PORT", "8000"))
+        uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 # Ensure INFO-level logs are visible for our modules (diagnostics, summary injection/updates)

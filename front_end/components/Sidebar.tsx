@@ -191,7 +191,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         aria-label="English Level Selection"
                         onChange={(e) => setEnglishLevel(e.target.value as EnglishLevel)}
                         className="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                        disabled={!isClientReady}
                     >
                         {englishLevels.map(level => (
                             <option key={level} value={level}>{level}</option>

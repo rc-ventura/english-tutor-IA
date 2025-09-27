@@ -192,26 +192,30 @@ This project delivers two core flows with cross-cutting resilience and observabi
 
 
 
-<hr>
+
+---
 
 ### Speaking Tutor (Hybrid mode)
 
-![Speaking Hybrid sequence](./assets/Speaking-tutor.png){ width=0.95\textwidth fig-align=center }
+![Speaking Hybrid sequence](./assets/Speaking-tutor.png){ width=0.75\textwidth fig-align=center }
 
-<hr>
 
+
+---
 
 #### Speaking Tutor (Immersive mode)
 
 ![Speaking Immersive sequence](./assets/Speaking-imersive.png){ width=0.75\textwidth fig-align=center }
 
-<hr>
 
 
+---
 
 ### Writing Tutor (Streaming feedback)
 
-![Writing Tutor sequence](./assets/Writing-tutor.png){ width=0.95\textwidth fig-align=center }
+![Writing Tutor sequence](./assets/Writing-tutor.png){ width=0.75\textwidth fig-align=center }
+
+---
 
 ## ⚙️ Configuration
 
